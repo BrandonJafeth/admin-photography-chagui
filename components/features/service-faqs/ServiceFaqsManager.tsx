@@ -1,0 +1,251 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { toast } from 'sonner'
+import { useServiceById } from '@/hooks/useServices'
+import {
+  useServiceFaqs,
+  useDeleteServiceFaq,
+  useUpdateServiceFaq,
+  useUpdateServiceFaqsOrder,
+} from '@/hooks/useServiceFaqs'
+import { ServiceFaq } from '@/services/service-faqs.service'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ArrowLeft, ArrowDown, ArrowUp, Plus, Pencil, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { FaqSheet } from './FaqSheet'
+
+interface ServiceFaqsManagerProps {
+  serviceId: string
+}
+
+export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProps) {
+  const { data: service, isLoading: isLoadingService } = useServiceById(serviceId)
+  const { data: faqs = [], isLoading: isLoadingFaqs } = useServiceFaqs(serviceId)
+  const deleteFaq = useDeleteServiceFaq(serviceId)
+  const updateFaq = useUpdateServiceFaq(serviceId)
+  const updateOrder = useUpdateServiceFaqsOrder(serviceId)
+
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [editingFaq, setEditingFaq] = useState<ServiceFaq | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [faqToDelete, setFaqToDelete] = useState<{ id: string; question: string } | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  const handleCreate = () => {
+    setEditingFaq(null)
+    setIsSheetOpen(true)
+  }
+
+  const handleEdit = (faq: ServiceFaq) => {
+    setEditingFaq(faq)
+    setIsSheetOpen(true)
+  }
+
+  const handleDelete = (id: string, question: string) => {
+    setFaqToDelete({ id, question })
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!faqToDelete) return
+    try {
+      await deleteFaq.mutateAsync(faqToDelete.id)
+      toast.success('Pregunta eliminada')
+    } catch (error) {
+      toast.error('Error al eliminar')
+    } finally {
+      setDeleteDialogOpen(false)
+      setFaqToDelete(null)
+    }
+  }
+
+  const handleToggleActive = async (faq: ServiceFaq) => {
+    setTogglingId(faq.id)
+    try {
+      await updateFaq.mutateAsync({ id: faq.id, payload: { is_active: !faq.is_active } })
+    } catch (error) {
+      toast.error('Error al cambiar visibilidad')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const handleMove = async (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= faqs.length) return
+
+    const reordered = [...faqs]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(targetIndex, 0, moved)
+
+    const updates = reordered.map((faq, i) => ({ id: faq.id, order: i }))
+
+    try {
+      await updateOrder.mutateAsync(updates)
+    } catch (error) {
+      toast.error('Error al reordenar')
+    }
+  }
+
+  if (isLoadingService || isLoadingFaqs) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-hidden">
+      <div className="h-full overflow-y-auto bg-[#0d0d0d]">
+        <div className="p-6">
+          <div className="max-w-[1400px] mx-auto">
+            <Link href="/servicios">
+              <Button variant="ghost" size="sm" className="gap-2 mb-4 -ml-2">
+                <ArrowLeft className="w-4 h-4" />
+                Volver a Servicios
+              </Button>
+            </Link>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-[#1a1a1a] p-4 md:p-6 rounded-lg shadow-sm border border-white/10">
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  Preguntas Frecuentes {service ? `— ${service.title}` : ''}
+                </h1>
+                <p className="text-sm text-white/60">Gestiona las preguntas frecuentes de este servicio</p>
+              </div>
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Agregar Pregunta
+              </Button>
+            </div>
+
+            <div className="bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">Orden</TableHead>
+                    <TableHead>Pregunta</TableHead>
+                    <TableHead>Respuesta</TableHead>
+                    <TableHead>Activo</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {faqs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-32 text-center text-white/50">
+                        No hay preguntas frecuentes. Agrega una para comenzar.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    faqs.map((faq, index) => (
+                      <TableRow key={faq.id}>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={index === 0}
+                              onClick={() => handleMove(index, -1)}
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={index === faqs.length - 1}
+                              onClick={() => handleMove(index, 1)}
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium text-white max-w-xs truncate">{faq.question}</TableCell>
+                        <TableCell className="text-white/60 max-w-sm truncate">{faq.answer}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleToggleActive(faq)}
+                            disabled={togglingId === faq.id}
+                            className="gap-1.5 px-2"
+                          >
+                            {togglingId === faq.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : faq.is_active ? (
+                              <Eye className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                              <EyeOff className="w-3.5 h-3.5 text-white/40" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(faq)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-400 hover:text-red-300"
+                              onClick={() => handleDelete(faq.id, faq.question)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <FaqSheet serviceId={serviceId} faq={editingFaq} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar pregunta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar "{faqToDelete?.question}". Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

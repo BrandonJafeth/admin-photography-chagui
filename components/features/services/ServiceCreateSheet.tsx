@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useState, useRef } from 'react'
 import { useCreateService, useServices } from '@/hooks/useServices'
-import { createServiceSchema, type CreateServiceFormData } from '@/lib/validations/services'
+import { slugify } from '@/lib/validations/services'
 import { uploadToCloudinary, getImageValidationError } from '@/lib/cloudinary'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { StringListField } from '@/components/ui/StringListField'
 import {
   Sheet,
   SheetContent,
@@ -33,13 +32,21 @@ export function ServiceCreateSheet({
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
+  const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState('')
-  const [ctaText, setCtaText] = useState('Ver más')
-  const [ctaLink, setCtaLink] = useState('')
+  const [detailedDescription, setDetailedDescription] = useState('')
+  const [features, setFeatures] = useState<string[]>([])
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleTitleChange = (value: string) => {
+    setTitle(value)
+    if (!slugTouched) {
+      setSlug(slugify(value))
+    }
+  }
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -58,22 +65,32 @@ export function ServiceCreateSheet({
     setPreviewUrl(URL.createObjectURL(file))
   }
 
-  // Función para verificar si hay errores de validación
+  const reset = () => {
+    setTitle('')
+    setSlug('')
+    setSlugTouched(false)
+    setDescription('')
+    setDetailedDescription('')
+    setFeatures([])
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setUploadError(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const hasValidationErrors = () => {
     if (!title || title.length < 3 || title.length > 200) return true
     if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.startsWith('-') || slug.endsWith('-')) return true
     if (!description || description.length < 20 || description.length > 2000) return true
-    if (!selectedFile) return true // Imagen requerida
+    if (!selectedFile) return true
     return false
   }
 
   const handleCreate = async () => {
-    // Validar antes de intentar crear
-    if (hasValidationErrors()) {
-      return // No hacer nada, las validaciones visuales ya están mostrando el error
-    }
+    if (hasValidationErrors()) return
 
-    // Mostrar toast de loading
     const loadingToast = toast.loading('Creando servicio...', {
       description: selectedFile ? 'Subiendo imagen y guardando...' : 'Guardando...',
     })
@@ -83,10 +100,9 @@ export function ServiceCreateSheet({
 
       let uploadedImageUrl = ''
 
-      // Subir la imagen solo si hay un archivo seleccionado
       if (selectedFile) {
         try {
-          const result = await uploadToCloudinary(selectedFile, 'services')
+          const result = await uploadToCloudinary(selectedFile, 'photographic-images/services')
           uploadedImageUrl = result.url
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Error al subir la imagen'
@@ -95,7 +111,7 @@ export function ServiceCreateSheet({
           toast.error('Error al subir imagen', {
             description: errorMessage,
           })
-          return // No crear el servicio si falla la subida de imagen
+          return
         }
       }
 
@@ -103,8 +119,8 @@ export function ServiceCreateSheet({
         title,
         slug,
         description,
-        cta_text: ctaText,
-        cta_link: undefined,
+        detailed_description: detailedDescription || undefined,
+        features: features.filter(f => f.trim().length > 0),
         image: uploadedImageUrl,
         order: nextOrder,
         is_active: true,
@@ -115,37 +131,22 @@ export function ServiceCreateSheet({
         description: `El servicio "${title}" se creó correctamente`,
       })
 
-      // Reset
-      setTitle('')
-      setSlug('')
-      setDescription('')
-      setCtaText('Ver más ')
-      setSelectedFile(null)
-      setPreviewUrl(null)
-      setUploadError(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      reset()
       onOpenChange(false)
     } catch (error) {
       console.error('Error al crear servicio:', error)
       toast.dismiss(loadingToast)
-      
-      // Extraer mensaje de error específico
+
       let errorMessage = 'No se pudo crear el servicio. Intenta nuevamente.'
-      
+
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === 'object' && error !== null) {
-        // Manejar errores de Supabase o base de datos
         const dbError = error as any
-        
+
         if (dbError.code === '23505') {
-          // Error de unique constraint
           if (dbError.message?.includes('services_slug_key')) {
             errorMessage = `El slug "${slug}" ya está en uso. Por favor elige otro.`
-          } else if (dbError.message?.includes('services_title_key')) {
-            errorMessage = `Ya existe un servicio con el título "${title}".`
           } else {
             errorMessage = 'Ya existe un servicio con estos datos. Verifica el título o slug.'
           }
@@ -155,7 +156,7 @@ export function ServiceCreateSheet({
           errorMessage = dbError.error
         }
       }
-      
+
       toast.error('Error al crear servicio', {
         description: errorMessage,
       })
@@ -165,7 +166,7 @@ export function ServiceCreateSheet({
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200">
+        <div className="sticky top-0 z-10 bg-[#1a1a1a] border-b border-white/10">
           <SheetHeader className="px-6 py-4">
             <SheetTitle className="text-xl">Crear Nuevo Servicio</SheetTitle>
             <SheetDescription>
@@ -179,7 +180,7 @@ export function ServiceCreateSheet({
           {previewUrl ? (
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Vista Previa</Label>
-              <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-slate-200 bg-slate-50">
+              <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
                 <img
                   src={previewUrl}
                   alt="Preview"
@@ -210,45 +211,36 @@ export function ServiceCreateSheet({
               {selectedFile ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
             </Button>
             {uploadError && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
+              <p className="text-xs text-red-400 flex items-center gap-1">
                 {uploadError}
               </p>
             )}
             {!selectedFile && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
+              <p className="text-xs text-amber-400 flex items-center gap-1">
                 La imagen es requerida
               </p>
             )}
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-white/40">
               Formatos: JPEG, PNG, WebP, GIF • Máximo: 5MB
             </p>
           </div>
 
           {/* Título */}
-          <div className="space-y-2 border-t pt-6">
+          <div className="space-y-2 border-t border-white/10 pt-6">
             <Label htmlFor="title" className="text-sm font-medium">
               Título *
             </Label>
             <Input
               id="title"
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => handleTitleChange(e.target.value)}
               placeholder="Ej: BODAS"
             />
             {title && title.length < 3 && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
-                El título debe tener al menos 3 caracteres
-              </p>
+              <p className="text-xs text-amber-400">El título debe tener al menos 3 caracteres</p>
             )}
             {title && title.length > 200 && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                El título es demasiado largo (máximo 200 caracteres)
-              </p>
-            )}
-            {!title && (
-              <p className="text-xs text-slate-500">
-                El título es requerido
-              </p>
+              <p className="text-xs text-red-400">El título es demasiado largo (máximo 200 caracteres)</p>
             )}
           </div>
 
@@ -260,25 +252,19 @@ export function ServiceCreateSheet({
             <Input
               id="slug"
               value={slug}
-              onChange={e => setSlug(e.target.value.toLowerCase())}
+              onChange={e => {
+                setSlugTouched(true)
+                setSlug(e.target.value.toLowerCase())
+              }}
               placeholder="Ej: bodas"
               className="font-mono text-sm"
             />
             {slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
+              <p className="text-xs text-red-400">
                 Solo letras minúsculas, números y guiones (ejemplo: fotografia-bodas)
               </p>
             )}
-            {slug && (slug.startsWith('-') || slug.endsWith('-')) && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                No puede empezar ni terminar con guión
-              </p>
-            )}
-            {!slug && (
-              <p className="text-xs text-slate-500">
-                El slug es requerido (identificador único para la URL)
-              </p>
-            )}
+            <p className="text-xs text-white/40">Se genera automáticamente desde el título, pero puedes editarlo</p>
           </div>
 
           {/* Descripción */}
@@ -290,54 +276,52 @@ export function ServiceCreateSheet({
               id="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="w-full min-h-[100px] px-3 py-2.5 border rounded-md resize-y bg-white border-slate-300 text-black text-sm leading-relaxed focus:ring-2 focus:ring-primary"
+              className="w-full min-h-[100px] px-3 py-2.5 border rounded-md resize-y bg-[#0d0d0d] border-white/15 text-white text-sm leading-relaxed focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
               placeholder="Describe el servicio de manera clara y concisa..."
             />
             {description && description.length < 20 && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
-                La descripción debe tener al menos 20 caracteres
-              </p>
-            )}
-            {description && description.length > 2000 && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                La descripción es demasiado larga (máximo 2000 caracteres)
-              </p>
-            )}
-            {!description && (
-              <p className="text-xs text-slate-500">
-                La descripción es requerida (mínimo 20 caracteres)
-              </p>
+              <p className="text-xs text-amber-400">La descripción debe tener al menos 20 caracteres</p>
             )}
           </div>
 
-          {/* CTA Text */}
+          {/* Descripción detallada */}
           <div className="space-y-2">
-            <Label htmlFor="ctaText" className="text-sm font-medium">
-              Texto del Botón CTA
+            <Label htmlFor="detailedDescription" className="text-sm font-medium">
+              Descripción Detallada (opcional)
             </Label>
-            <Input
-              id="ctaText"
-              value={ctaText}
-              onChange={e => setCtaText(e.target.value)}
-              placeholder="Ej: Ver más "
+            <textarea
+              id="detailedDescription"
+              value={detailedDescription}
+              onChange={e => setDetailedDescription(e.target.value)}
+              className="w-full min-h-[100px] px-3 py-2.5 border rounded-md resize-y bg-[#0d0d0d] border-white/15 text-white text-sm leading-relaxed focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
+              placeholder="Información ampliada que se muestra en la página del servicio..."
             />
           </div>
 
-            {/* Mensaje de validación */}
-            {hasValidationErrors() && (
-              <div className="text-sm text-amber-600 flex items-center gap-2 -mt-4">
-                <span className="w-2 h-2 bg-amber-500 rounded-full" />
-                Por favor completa todos los campos requeridos correctamente
-              </div>
-            )}
+          {/* Features */}
+          <div className="border-t border-white/10 pt-6">
+            <StringListField
+              label="Características"
+              items={features}
+              onChange={setFeatures}
+              placeholder="Ej: 8 horas de cobertura"
+              disabled={createService.isPending}
+            />
+          </div>
+
+          {hasValidationErrors() && (
+            <div className="text-sm text-amber-400 flex items-center gap-2 -mt-4">
+              <span className="w-2 h-2 bg-amber-400 rounded-full" />
+              Por favor completa todos los campos requeridos correctamente
+            </div>
+          )}
 
           {/* Actions */}
-          <div className="sticky bottom-0 bg-white -mx-6 px-6 py-4 flex gap-3">
+          <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10 -mx-6 px-6 py-4 flex gap-3">
             <Button
               onClick={handleCreate}
               disabled={createService.isPending || hasValidationErrors()}
               className="flex-1 h-11"
-              variant={'default'}
             >
               {createService.isPending ? (
                 <span className="flex items-center gap-2">
@@ -353,16 +337,7 @@ export function ServiceCreateSheet({
               type="button"
               variant="outline"
               onClick={() => {
-                setTitle('')
-                setSlug('')
-                setDescription('')
-                setCtaText('Ver más')
-                setSelectedFile(null)
-                setPreviewUrl(null)
-                setUploadError(null)
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = ''
-                }
+                reset()
                 onOpenChange(false)
               }}
               className="h-11"

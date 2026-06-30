@@ -3,15 +3,15 @@ import { SidebarProvider } from '@/components/animate-ui/components/radix/sideba
 import SidebarHeaderTrigger from '@/components/dashboard/Header'
 
 export const metadata = {
-  title: 'Admin Dashboard',
+  title: 'Photographic Images — Admin',
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-[#F5F5F7]">
+      <div className="flex min-h-screen w-full bg-[#0d0d0d]">
         <Sidebar />
-        <main className="flex-1 bg-[#F5F5F7]">
+        <main className="flex-1 bg-[#0d0d0d]">
           <SidebarHeaderTrigger />
           {children}
         </main>

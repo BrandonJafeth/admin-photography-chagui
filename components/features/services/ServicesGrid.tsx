@@ -43,8 +43,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
     if (!isReordering) return
     setDraggedId(id)
     setDragPosition({ x: e.clientX, y: e.clientY })
-    
-    // Crear imagen fantasma invisible
+
     const ghost = document.createElement('div')
     ghost.style.opacity = '0'
     document.body.appendChild(ghost)
@@ -62,7 +61,6 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
   }
 
   const handleDragEnd = () => {
-    // Limpiar el estado cuando termina el drag, sin importar si se hizo drop o no
     setDraggedId(null)
   }
 
@@ -134,7 +132,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
 
     const loadingToast = toast.loading('Eliminando servicio...', {
       description: 'Por favor espera',
-    }) 
+    })
 
     try {
       await deleteService.mutateAsync(serviceToDelete.id)
@@ -158,7 +156,6 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
 
   return (
     <>
-      {/* Elemento fantasma que sigue al cursor */}
       {draggedId && draggedService && (
         <div
           className="fixed pointer-events-none z-[9999] opacity-90"
@@ -169,8 +166,8 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
             width: '300px',
           }}
         >
-          <div className="rounded-xl overflow-hidden bg-white border-2 border-blue-500 shadow-2xl">
-            <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+          <div className="rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl">
+            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
               {draggedService.image ? (
                 <img
                   src={draggedService.image}
@@ -178,14 +175,14 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                  <span className="text-slate-500 text-sm">Sin imagen</span>
+                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                  <span className="text-white/40 text-sm">Sin imagen</span>
                 </div>
               )}
             </div>
             <div className="p-3">
-              <h3 className="text-sm font-bold text-slate-900 truncate">{draggedService.title}</h3>
-              <p className="text-xs text-indigo-600 truncate">/{draggedService.slug}</p>
+              <h3 className="text-sm font-bold text-white truncate">{draggedService.title}</h3>
+              <p className="text-xs text-white/50 truncate">/{draggedService.slug}</p>
             </div>
           </div>
         </div>
@@ -201,13 +198,13 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
             onDragOver={handleDragOver}
             onDrop={() => handleDrop(service.id)}
             onDragEnd={handleDragEnd}
-            className={`relative group rounded-xl overflow-hidden bg-white border border-slate-200 shadow-md hover:shadow-xl transition-all ${isReordering ? 'cursor-move' : 'cursor-default'} ${draggedId === service.id
-              ? 'ring-4 ring-blue-500 shadow-2xl scale-105'
+            className={`relative group rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 shadow-md hover:shadow-xl transition-all ${isReordering ? 'cursor-move' : 'cursor-default'} ${draggedId === service.id
+              ? 'ring-4 ring-white/40 shadow-2xl scale-105'
               : 'hover:scale-[1.02]'
               }`}
           >
             {/* Imagen */}
-            <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
               {service.image ? (
                 <img
                   src={service.image}
@@ -215,26 +212,24 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                  <span className="text-slate-500 text-sm">Sin imagen</span>
+                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                  <span className="text-white/40 text-sm">Sin imagen</span>
                 </div>
               )}
 
-              {/* Badge de Estado - Arriba derecha */}
               {!isReordering && (
                 <div className="absolute top-3 right-3">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${service.is_active
                     ? 'bg-green-500 text-white'
-                    : 'bg-slate-400 text-white'
+                    : 'bg-white/20 text-white'
                     }`}>
                     {service.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
               )}
 
-              {/* Drag Handle - Solo visible en modo reordering */}
               {isReordering && (
-                <div className="absolute top-2 left-2 bg-blue-600 text-white p-2 rounded cursor-move shadow-lg">
+                <div className="absolute top-2 left-2 bg-white text-black p-2 rounded cursor-move shadow-lg">
                   <GripVertical className="w-4 h-4" />
                 </div>
               )}
@@ -244,26 +239,24 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
             <div className="p-5 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-bold text-slate-900 mb-1">{service.title}</h3>
-                  <p className="text-xs text-indigo-600 font-medium">/{service.slug}</p>
+                  <h3 className="text-base font-bold text-white mb-1">{service.title}</h3>
+                  <p className="text-xs text-white/50 font-medium">/{service.slug}</p>
                 </div>
                 {isReordering && (
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                    <span className="text-xs font-semibold text-white bg-white/10 px-2 py-1 rounded">
                       #{index + 1}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Description */}
-              <p className="text-sm text-slate-600 line-clamp-2 min-h-[2.5rem]">
+              <p className="text-sm text-white/60 line-clamp-2 min-h-[2.5rem]">
                 {service.description}
               </p>
 
-              {/* Actions */}
               {!isReordering && (
-                <div className="flex gap-2 pt-3 border-t border-slate-200">
+                <div className="flex gap-2 pt-3 border-t border-white/10">
                   <Button
                     size="sm"
                     variant="outline"
@@ -311,7 +304,6 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
         ))}
       </div>
 
-      {/* Edit Sheet */}
       {editingService && (
         <ServiceEditSheet
           service={editingService}
@@ -324,20 +316,19 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de eliminar "{serviceToDelete?.title}". Esta acción no se puede deshacer.
+              Estás a punto de eliminar "{serviceToDelete?.title}". Esta acción no se puede deshacer y también eliminará sus preguntas frecuentes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Eliminar
             </AlertDialogAction>
