@@ -234,7 +234,7 @@ export default function PackagesManager() {
         </div>
       </div>
 
-      <PackageSheet pkg={editingPackage} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
+      <PackageSheet key={editingPackage?.id ?? 'new'} pkg={editingPackage} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

@@ -315,6 +315,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
 
       {editingService && (
         <ServiceEditSheet
+          key={editingService.id}
           service={editingService}
           isOpen={isSheetOpen}
           onOpenChange={setIsSheetOpen}

@@ -1,10 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
-/**
- * API Route para eliminar imágenes de Cloudinary desde el servidor
- * Esto es necesario porque la generación de firma SHA-1 requiere acceso a crypto
- */
+function extractPublicId(url: string): string | null {
+  try {
+    const uploadIndex = url.indexOf('/image/upload/')
+    if (uploadIndex === -1) {
+      console.warn(`URL no es de Cloudinary: ${url}`)
+      return null
+    }
+
+    const afterUpload = url.substring(uploadIndex + '/image/upload/'.length)
+    const parts = afterUpload.split('/')
+    let publicIdParts: string[] = []
+    let foundPublicId = false
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+
+      if (/\./.test(part)) {
+        const filename = part.replace(/\.(jpg|jpeg|png|webp|gif|avif)$/i, '')
+        publicIdParts.push(filename)
+        foundPublicId = true
+        break
+      }
+
+      if (/^(v\d+|w_|h_|c_|q_|f_|ar_|dpr_|e_|fl_|g_|l_|o_|r_|t_|u_|x_|y_|z_)/.test(part)) {
+        continue
+      }
+
+      publicIdParts.push(part)
+      foundPublicId = true
+    }
+
+    if (!foundPublicId || publicIdParts.length === 0) {
+      console.warn(`No se pudo extraer public_id de la URL: ${url}`)
+      return null
+    }
+
+    return publicIdParts.join('/')
+  } catch (error) {
+    console.error('Error extracting public_id:', error)
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json()
@@ -25,58 +64,6 @@ export async function POST(request: NextRequest) {
         { error: 'Cloudinary credentials missing' },
         { status: 500 }
       )
-    }
-
-    // Extraer public_id de la URL usando el mismo patrón mejorado
-    const extractPublicId = (url: string): string | null => {
-      try {
-        const uploadIndex = url.indexOf('/image/upload/')
-        if (uploadIndex === -1) {
-          console.warn(`URL no es de Cloudinary: ${url}`)
-          return null
-        }
-
-        // Obtener todo después de /image/upload/
-        const afterUpload = url.substring(uploadIndex + '/image/upload/'.length)
-        
-        // Separar por '/' para obtener las partes
-        const parts = afterUpload.split('/')
-        
-        // Identificar dónde empieza el public_id
-        let publicIdParts: string[] = []
-        let foundPublicId = false
-        
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i]
-          
-          if (/\./.test(part)) {
-            // Remover la extensión
-            const filename = part.replace(/\.(jpg|jpeg|png|webp|gif|avif)$/i, '')
-            publicIdParts.push(filename)
-            foundPublicId = true
-            break
-          }
-          
-          // Si la parte es una transformación, la saltamos
-          if (/^(v\d+|w_|h_|c_|q_|f_|ar_|dpr_|e_|fl_|g_|l_|o_|r_|t_|u_|x_|y_|z_)/.test(part)) {
-            continue
-          }
-          
-          // Es parte del public_id (carpeta o nombre)
-          publicIdParts.push(part)
-          foundPublicId = true
-        }
-        
-        if (!foundPublicId || publicIdParts.length === 0) {
-          console.warn(`No se pudo extraer public_id de la URL: ${url}`)
-          return null
-        }
-        
-        return publicIdParts.join('/')
-      } catch (error) {
-        console.error('Error extracting public_id:', error)
-        return null
-      }
     }
 
     const publicId = extractPublicId(url)

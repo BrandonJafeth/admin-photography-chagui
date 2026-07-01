@@ -22,7 +22,7 @@ export function usePackages() {
 /**
  * Hook para obtener un paquete por ID
  */
-export function usePackageById(id: string) {
+function usePackageById(id: string) {
   return useQuery({
     queryKey: ['packages', id],
     queryFn: () => PackagesService.getById(id),

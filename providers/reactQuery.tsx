@@ -22,4 +22,3 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
   )
 }
 
-export { queryClient }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { useCreateService, useServices } from '@/hooks/useServices'
 import { slugify } from '@/lib/validations/services'
 import { uploadToCloudinary, getImageValidationError } from '@/lib/cloudinary'
@@ -32,7 +33,7 @@ export function ServiceCreateSheet({
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
-  const [slugTouched, setSlugTouched] = useState(false)
+  const slugTouchedRef = useRef(false)
   const [description, setDescription] = useState('')
   const [detailedDescription, setDetailedDescription] = useState('')
   const [features, setFeatures] = useState<string[]>([])
@@ -43,7 +44,7 @@ export function ServiceCreateSheet({
 
   const handleTitleChange = (value: string) => {
     setTitle(value)
-    if (!slugTouched) {
+    if (!slugTouchedRef.current) {
       setSlug(slugify(value))
     }
   }
@@ -68,7 +69,7 @@ export function ServiceCreateSheet({
   const reset = () => {
     setTitle('')
     setSlug('')
-    setSlugTouched(false)
+    slugTouchedRef.current = false
     setDescription('')
     setDetailedDescription('')
     setFeatures([])
@@ -181,10 +182,13 @@ export function ServiceCreateSheet({
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Vista Previa</Label>
               <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
-                <img
+                <Image
                   src={previewUrl}
                   alt="Preview"
-                  className="w-full h-full object-cover"
+                  fill
+                  unoptimized
+                  sizes="(min-width: 640px) 42rem, 100vw"
+                  className="object-cover"
                 />
               </div>
             </div>
@@ -197,6 +201,7 @@ export function ServiceCreateSheet({
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              aria-label="Seleccionar imagen"
               onChange={handleImageSelect}
               className="hidden"
             />
@@ -253,7 +258,7 @@ export function ServiceCreateSheet({
               id="slug"
               value={slug}
               onChange={e => {
-                setSlugTouched(true)
+                slugTouchedRef.current = true
                 setSlug(e.target.value.toLowerCase())
               }}
               placeholder="Ej: bodas"
@@ -274,6 +279,7 @@ export function ServiceCreateSheet({
             </Label>
             <textarea
               id="description"
+              aria-label="Descripción"
               value={description}
               onChange={e => setDescription(e.target.value)}
               className="w-full min-h-[100px] px-3 py-2.5 border rounded-md resize-y bg-[#0d0d0d] border-white/15 text-white text-sm leading-relaxed focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
@@ -291,6 +297,7 @@ export function ServiceCreateSheet({
             </Label>
             <textarea
               id="detailedDescription"
+              aria-label="Descripción Detallada"
               value={detailedDescription}
               onChange={e => setDetailedDescription(e.target.value)}
               className="w-full min-h-[100px] px-3 py-2.5 border rounded-md resize-y bg-[#0d0d0d] border-white/15 text-white text-sm leading-relaxed focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"

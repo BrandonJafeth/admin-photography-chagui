@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from '@/lib/toast'
 import { ServiceFaq } from '@/services/service-faqs.service'
 import { useCreateServiceFaq, useUpdateServiceFaq, useServiceFaqs } from '@/hooks/useServiceFaqs'
@@ -28,15 +28,8 @@ export function FaqSheet({ serviceId, faq, isOpen, onOpenChange }: FaqSheetProps
   const createFaq = useCreateServiceFaq()
   const updateFaq = useUpdateServiceFaq(serviceId)
 
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-
-  useEffect(() => {
-    if (isOpen) {
-      setQuestion(faq?.question || '')
-      setAnswer(faq?.answer || '')
-    }
-  }, [isOpen, faq])
+  const [question, setQuestion] = useState(faq?.question || '')
+  const [answer, setAnswer] = useState(faq?.answer || '')
 
   const isPending = createFaq.isPending || updateFaq.isPending
   const hasValidationErrors = () => !question.trim() || !answer.trim()
@@ -93,6 +86,7 @@ export function FaqSheet({ serviceId, faq, isOpen, onOpenChange }: FaqSheetProps
             <Label htmlFor="answer" className="text-sm font-medium">Respuesta *</Label>
             <textarea
               id="answer"
+              aria-label="Respuesta"
               value={answer}
               onChange={e => setAnswer(e.target.value)}
               className="w-full min-h-[140px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"

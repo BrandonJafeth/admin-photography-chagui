@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from '@/lib/toast'
 import { Package } from '@/services/packages.service'
 import { useCreatePackage, useUpdatePackage, usePackages } from '@/hooks/usePackages'
@@ -39,21 +39,11 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
   const createPackage = useCreatePackage()
   const updatePackage = useUpdatePackage()
 
-  const [serviceId, setServiceId] = useState<string>(UNIVERSAL_VALUE)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [includes, setIncludes] = useState<string[]>([])
-  const [isFeatured, setIsFeatured] = useState(false)
-
-  useEffect(() => {
-    if (isOpen) {
-      setServiceId(pkg?.service_id || UNIVERSAL_VALUE)
-      setName(pkg?.name || '')
-      setDescription(pkg?.description || '')
-      setIncludes(pkg?.includes || [])
-      setIsFeatured(pkg?.is_featured ?? false)
-    }
-  }, [isOpen, pkg])
+  const [serviceId, setServiceId] = useState<string>(pkg?.service_id || UNIVERSAL_VALUE)
+  const [name, setName] = useState(pkg?.name || '')
+  const [description, setDescription] = useState(pkg?.description || '')
+  const [includes, setIncludes] = useState<string[]>(pkg?.includes || [])
+  const [isFeatured, setIsFeatured] = useState(pkg?.is_featured ?? false)
 
   const isPending = createPackage.isPending || updatePackage.isPending
 
@@ -141,6 +131,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
             <Label htmlFor="description" className="text-sm font-medium">Descripción</Label>
             <textarea
               id="description"
+              aria-label="Descripción"
               value={description}
               onChange={e => setDescription(e.target.value)}
               className="w-full min-h-[80px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"

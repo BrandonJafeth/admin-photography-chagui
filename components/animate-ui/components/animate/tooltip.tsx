@@ -26,4 +26,3 @@ export function TooltipContent({ children, ...props }: any) {
   )
 }
 
-export default Tooltip

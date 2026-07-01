@@ -49,4 +49,3 @@ export function HighlightItem({ children, activeClassName, className }: Highligh
   )
 }
 
-export default Highlight

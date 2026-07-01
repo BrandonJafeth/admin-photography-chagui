@@ -26,6 +26,7 @@ export default function UserMenu() {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors w-full"
       >
@@ -40,12 +41,16 @@ export default function UserMenu() {
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-10"
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            className="fixed inset-0 z-10 cursor-default"
             onClick={() => setIsOpen(false)}
+            onKeyDown={e => e.key === 'Escape' && setIsOpen(false)}
           />
           <div className="absolute left-0 bottom-full mb-2 w-56 bg-[#1a1a1a] rounded-lg shadow-lg border border-white/10 py-1 z-20">
             <button
+              type="button"
               onClick={handleSignOut}
               disabled={isLoading}
               className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2 disabled:opacity-50"

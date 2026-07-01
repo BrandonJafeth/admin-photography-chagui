@@ -337,7 +337,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
         </div>
       </div>
 
-      <FaqSheet serviceId={serviceId} faq={editingFaq} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
+      <FaqSheet key={editingFaq?.id ?? 'new'} serviceId={serviceId} faq={editingFaq} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

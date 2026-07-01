@@ -11,11 +11,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <SessionGuard />
-      <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-[#0d0d0d]">
+      <div className="flex h-screen w-full max-w-full overflow-hidden bg-[#0d0d0d]">
         <Sidebar />
-        <main className="flex-1 min-w-0 bg-[#0d0d0d]">
+        <main className="flex-1 min-w-0 h-full flex flex-col overflow-hidden bg-[#0d0d0d]">
           <SidebarHeaderTrigger />
-          {children}
+          <div className="flex-1 min-h-0">
+            {children}
+          </div>
         </main>
       </div>
     </SidebarProvider>

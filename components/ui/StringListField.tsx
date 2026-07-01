@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, X } from 'lucide-react'
@@ -19,11 +20,19 @@ export function StringListField({
   placeholder = 'Ej: 8 horas de cobertura',
   disabled = false,
 }: StringListFieldProps) {
+  const idsRef = useRef<string[] | null>(null)
+  if (idsRef.current === null) {
+    idsRef.current = Array.from({ length: items.length }, () => crypto.randomUUID())
+  }
+  const ids = idsRef.current
+
   const handleAdd = () => {
+    idsRef.current = [...ids, crypto.randomUUID()]
     onChange([...items, ''])
   }
 
   const handleRemove = (index: number) => {
+    idsRef.current = ids.filter((_, i) => i !== index)
     onChange(items.filter((_, i) => i !== index))
   }
 
@@ -53,7 +62,7 @@ export function StringListField({
       ) : (
         <div className="space-y-2">
           {items.map((item, index) => (
-            <div key={index} className="flex gap-2">
+            <div key={ids[index]} className="flex gap-2">
               <Input
                 value={item}
                 onChange={(e) => handleUpdate(index, e.target.value)}

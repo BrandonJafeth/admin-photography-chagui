@@ -67,7 +67,7 @@ export async function uploadToCloudinary(
 /**
  * Valida que el archivo sea una imagen
  */
-export function isValidImageFile(file: File): boolean {
+function isValidImageFile(file: File): boolean {
   const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
   const maxSize = 5 * 1024 * 1024 // 5MB
 
@@ -97,7 +97,7 @@ export function getImageValidationError(file: File): string | null {
  * @param url - URL de Cloudinary (ej: https://res.cloudinary.com/cloud/image/upload/v123/folder/image.jpg)
  * @returns public_id (ej: folder/image)
  */
-export function extractPublicIdFromUrl(url: string): string | null {
+function extractPublicIdFromUrl(url: string): string | null {
   try {
     // Patrón para URLs de Cloudinary
     // https://res.cloudinary.com/{cloud_name}/image/upload/{transformations}/{public_id}.{format}
@@ -253,7 +253,7 @@ export async function deleteFromCloudinary(url: string): Promise<boolean> {
  * @param urls - Array de URLs de imágenes en Cloudinary
  * @returns Número de imágenes eliminadas correctamente
  */
-export async function deleteManyFromCloudinary(urls: string[]): Promise<number> {
+async function deleteManyFromCloudinary(urls: string[]): Promise<number> {
   if (urls.length === 0) return 0
 
   const deletePromises = urls.map(url => deleteFromCloudinary(url))

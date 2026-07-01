@@ -4,7 +4,7 @@ import { z } from 'zod'
 // Regex para slug: solo letras minúsculas, números y guiones
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-export const serviceSchema = z.object({
+const serviceSchema = z.object({
   title: z.string()
     .min(3, 'El título debe tener al menos 3 caracteres')
     .max(200, 'El título es demasiado largo'),
@@ -40,14 +40,14 @@ export const serviceSchema = z.object({
 export type ServiceFormData = z.infer<typeof serviceSchema>
 
 // Schema para crear servicio
-export const createServiceSchema = serviceSchema.omit({
+const createServiceSchema = serviceSchema.omit({
   detailed_description: true,
 })
 
 export type CreateServiceFormData = z.infer<typeof createServiceSchema>
 
 // Schema para actualizar servicio (todos los campos opcionales excepto validaciones)
-export const updateServiceSchema = serviceSchema.partial()
+const updateServiceSchema = serviceSchema.partial()
 
 export type UpdateServiceFormData = z.infer<typeof updateServiceSchema>
 

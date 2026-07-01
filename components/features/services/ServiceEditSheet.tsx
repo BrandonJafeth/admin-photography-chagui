@@ -172,6 +172,7 @@ export function ServiceEditSheet({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                aria-label="Seleccionar imagen"
                 onChange={handleImageUpload}
                 disabled={isUploading}
                 className="hidden"
@@ -246,6 +247,7 @@ export function ServiceEditSheet({
             </Label>
             <textarea
               id="description"
+              aria-label="Descripción"
               value={description}
               onChange={e => setDescription(e.target.value)}
               className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
@@ -263,6 +265,7 @@ export function ServiceEditSheet({
             </Label>
             <textarea
               id="detailedDescription"
+              aria-label="Descripción Detallada"
               value={detailedDescription}
               onChange={e => setDetailedDescription(e.target.value)}
               className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
