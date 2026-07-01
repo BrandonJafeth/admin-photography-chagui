@@ -49,8 +49,7 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i]
           
-          // Si la parte contiene un punto, es probablemente el nombre del archivo
-          if (part.includes('.')) {
+          if (/\./.test(part)) {
             // Remover la extensión
             const filename = part.replace(/\.(jpg|jpeg|png|webp|gif|avif)$/i, '')
             publicIdParts.push(filename)

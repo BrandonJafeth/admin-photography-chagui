@@ -589,11 +589,11 @@ function normalizeFontRole(raw) {
   // Canonical roles the panel cares about: display, body, label, mono.
   // Stitch often writes compound roles like "display-&-headlines" or "ui-&-body"
   // — collapse them to the first canonical role present.
-  const tokens = raw.split(/[-/&\s]+/).filter(Boolean);
+  const tokenSet = new Set(raw.split(/[-/&\s]+/).filter(Boolean));
   const priority = ['display', 'headline', 'body', 'ui', 'label', 'mono'];
   const canonical = { headline: 'display', ui: 'body' };
   for (const p of priority) {
-    if (tokens.includes(p)) return canonical[p] || p;
+    if (tokenSet.has(p)) return canonical[p] || p;
   }
   return null;
 }

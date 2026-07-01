@@ -148,7 +148,7 @@ function normalizeDetectionConfigForWrite(config) {
     out.ignoreRules = uniqueStrings(config.ignoreRules.flatMap((rule) => { const r = normalizeIgnoreRule(rule); return r ? [r] : []; }));
   }
   if (Array.isArray(config?.ignoreFiles)) {
-    out.ignoreFiles = uniqueStrings(config.ignoreFiles.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim()));
+    out.ignoreFiles = uniqueStrings(config.ignoreFiles.flatMap(v => typeof v === 'string' && v.trim() ? [v.trim()] : []));
   }
   out.ignoreValues = normalizeIgnoreValueEntries(config?.ignoreValues || []);
   if (config?.designSystem && typeof config.designSystem === 'object' && !Array.isArray(config.designSystem)) {
@@ -343,7 +343,7 @@ export function normalizeIgnoreValueEntries(entries) {
     const normalized = { rule, value };
     const files = uniqueStrings([
       ...(typeof entry.file === 'string' && entry.file.trim() ? [entry.file.trim()] : []),
-      ...(Array.isArray(entry.files) ? entry.files.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim()) : []),
+      ...(Array.isArray(entry.files) ? entry.files.flatMap(v => typeof v === 'string' && v.trim() ? [v.trim()] : []) : []),
     ]);
     if (files.length > 0) normalized.files = files;
     if (typeof entry.reason === 'string' && entry.reason.trim()) {
@@ -391,11 +391,11 @@ function globToRegex(glob) {
       re += '[^/]';
       i += 1;
     } else if (c === '{') {
-      const end = glob.indexOf('}', i);
-      if (end === -1) { re += '\\{'; i += 1; continue; }
-      const parts = glob.slice(i + 1, end).split(',').map((p) => p.replace(/[.+^$()|[\]\\]/g, '\\$&'));
+      const altMatch = /^\{([^}]*)}/.exec(glob.slice(i));
+      if (!altMatch) { re += '\\{'; i += 1; continue; }
+      const parts = altMatch[1].split(',').map((p) => p.replace(/[.+^$()|[\]\\]/g, '\\$&'));
       re += `(?:${parts.join('|')})`;
-      i = end + 1;
+      i += altMatch[0].length;
     } else if (/[.+^$()|[\]\\]/.test(c)) {
       re += `\\${c}`;
       i += 1;
