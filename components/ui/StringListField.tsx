@@ -67,6 +67,8 @@ export function StringListField({
                 onClick={() => handleRemove(index)}
                 disabled={disabled}
                 className="shrink-0"
+                title="Eliminar este ítem"
+                aria-label="Eliminar este ítem"
               >
                 <X className="w-4 h-4" />
               </Button>

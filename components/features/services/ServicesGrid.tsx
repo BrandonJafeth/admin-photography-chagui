@@ -262,7 +262,8 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                     variant="outline"
                     onClick={() => handleToggleVisibility(service.id, service.is_active)}
                     className="flex-1 gap-1.5 text-xs"
-                    title={service.is_active ? 'Ocultar' : 'Mostrar'}
+                    title={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
+                    aria-label={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
                     disabled={togglingId === service.id}
                   >
                     {togglingId === service.id ? (
@@ -272,7 +273,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                     ) : (
                       <EyeOff className="w-3.5 h-3.5" />
                     )}
-                    {togglingId === service.id ? '...' : 'Ver'}
+                    {togglingId === service.id ? '...' : service.is_active ? 'Ocultar' : 'Mostrar'}
                   </Button>
                   <Button
                     size="sm"
@@ -282,7 +283,8 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                       setIsSheetOpen(true)
                     }}
                     className="flex-1 gap-1.5 text-xs"
-                    title="Editar"
+                    title="Editar este servicio"
+                    aria-label="Editar este servicio"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Editar
@@ -292,7 +294,8 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
                     variant="destructive"
                     onClick={() => handleDelete(service.id, service.title)}
                     className="gap-1.5 text-xs"
-                    title="Eliminar"
+                    title="Eliminar este servicio"
+                    aria-label="Eliminar este servicio"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>

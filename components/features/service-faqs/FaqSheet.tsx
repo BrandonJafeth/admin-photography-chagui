@@ -47,11 +47,15 @@ export function FaqSheet({ serviceId, faq, isOpen, onOpenChange }: FaqSheetProps
     try {
       if (faq) {
         await updateFaq.mutateAsync({ id: faq.id, payload: { question, answer } })
-        toast.success('Pregunta actualizada')
+        toast.success('Pregunta actualizada', {
+          description: 'Los cambios se guardaron correctamente',
+        })
       } else {
         const nextOrder = faqs.length > 0 ? Math.max(...faqs.map(f => f.order)) + 1 : 0
         await createFaq.mutateAsync({ service_id: serviceId, question, answer, order: nextOrder })
-        toast.success('Pregunta creada')
+        toast.success('Pregunta creada', {
+          description: 'La pregunta se agregó correctamente',
+        })
       }
       onOpenChange(false)
     } catch (error) {

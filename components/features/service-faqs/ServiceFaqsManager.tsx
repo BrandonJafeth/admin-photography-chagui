@@ -70,9 +70,13 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
     if (!faqToDelete) return
     try {
       await deleteFaq.mutateAsync(faqToDelete.id)
-      toast.success('Pregunta eliminada')
+      toast.success('Pregunta eliminada', {
+        description: `"${faqToDelete.question}" se eliminó correctamente`,
+      })
     } catch (error) {
-      toast.error('Error al eliminar')
+      toast.error('Error al eliminar', {
+        description: 'No se pudo eliminar la pregunta. Intenta nuevamente.',
+      })
     } finally {
       setDeleteDialogOpen(false)
       setFaqToDelete(null)
@@ -83,8 +87,15 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
     setTogglingId(faq.id)
     try {
       await updateFaq.mutateAsync({ id: faq.id, payload: { is_active: !faq.is_active } })
+      toast.success(faq.is_active ? 'Pregunta ocultada' : 'Pregunta visible', {
+        description: faq.is_active
+          ? 'Ya no aparecerá en el sitio público'
+          : 'Ahora es visible en el sitio público',
+      })
     } catch (error) {
-      toast.error('Error al cambiar visibilidad')
+      toast.error('Error al cambiar visibilidad', {
+        description: 'No se pudo actualizar la visibilidad. Intenta nuevamente.',
+      })
     } finally {
       setTogglingId(null)
     }
@@ -103,7 +114,9 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
     try {
       await updateOrder.mutateAsync(updates)
     } catch (error) {
-      toast.error('Error al reordenar')
+      toast.error('Error al reordenar', {
+        description: 'No se pudo actualizar el orden. Intenta nuevamente.',
+      })
     }
   }
 
@@ -162,6 +175,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                             className="h-7 w-7"
                             disabled={index === 0}
                             onClick={() => handleMove(index, -1)}
+                            title="Mover pregunta hacia arriba"
+                            aria-label="Mover pregunta hacia arriba"
                           >
                             <ArrowUp className="h-3.5 w-3.5" />
                           </Button>
@@ -171,6 +186,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                             className="h-7 w-7"
                             disabled={index === faqs.length - 1}
                             onClick={() => handleMove(index, 1)}
+                            title="Mover pregunta hacia abajo"
+                            aria-label="Mover pregunta hacia abajo"
                           >
                             <ArrowDown className="h-3.5 w-3.5" />
                           </Button>
@@ -182,6 +199,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                             onClick={() => handleToggleActive(faq)}
                             disabled={togglingId === faq.id}
                             className="gap-1.5 px-2"
+                            title={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
+                            aria-label={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
                           >
                             {togglingId === faq.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -191,7 +210,14 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                               <EyeOff className="w-3.5 h-3.5 text-white/40" />
                             )}
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(faq)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEdit(faq)}
+                            title="Editar esta pregunta"
+                            aria-label="Editar esta pregunta"
+                          >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
@@ -199,6 +225,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                             size="icon"
                             className="h-8 w-8 text-red-400 hover:text-red-300"
                             onClick={() => handleDelete(faq.id, faq.question)}
+                            title="Eliminar esta pregunta"
+                            aria-label="Eliminar esta pregunta"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -235,6 +263,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                                 className="h-5 w-5"
                                 disabled={index === 0}
                                 onClick={() => handleMove(index, -1)}
+                                title="Mover pregunta hacia arriba"
+                                aria-label="Mover pregunta hacia arriba"
                               >
                                 <ArrowUp className="h-3.5 w-3.5" />
                               </Button>
@@ -244,6 +274,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                                 className="h-5 w-5"
                                 disabled={index === faqs.length - 1}
                                 onClick={() => handleMove(index, 1)}
+                                title="Mover pregunta hacia abajo"
+                                aria-label="Mover pregunta hacia abajo"
                               >
                                 <ArrowDown className="h-3.5 w-3.5" />
                               </Button>
@@ -258,6 +290,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                               onClick={() => handleToggleActive(faq)}
                               disabled={togglingId === faq.id}
                               className="gap-1.5 px-2"
+                              title={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
+                              aria-label={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
                             >
                               {togglingId === faq.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -270,7 +304,14 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(faq)}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEdit(faq)}
+                                title="Editar esta pregunta"
+                                aria-label="Editar esta pregunta"
+                              >
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
@@ -278,6 +319,8 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
                                 size="icon"
                                 className="h-8 w-8 text-red-400 hover:text-red-300"
                                 onClick={() => handleDelete(faq.id, faq.question)}
+                                title="Eliminar esta pregunta"
+                                aria-label="Eliminar esta pregunta"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

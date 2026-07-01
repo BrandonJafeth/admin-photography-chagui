@@ -81,9 +81,15 @@ export default function PackagesManager() {
     setTogglingId(pkg.id)
     try {
       await updatePackage.mutateAsync({ id: pkg.id, payload: { is_active: !pkg.is_active } })
-      toast.success(pkg.is_active ? 'Paquete ocultado' : 'Paquete visible')
+      toast.success(pkg.is_active ? 'Paquete ocultado' : 'Paquete visible', {
+        description: pkg.is_active
+          ? 'Ya no aparecerá en el sitio público'
+          : 'Ahora es visible en el sitio público',
+      })
     } catch (error) {
-      toast.error('Error al cambiar visibilidad')
+      toast.error('Error al cambiar visibilidad', {
+        description: 'No se pudo actualizar la visibilidad. Intenta nuevamente.',
+      })
     } finally {
       setTogglingId(null)
     }
@@ -92,9 +98,15 @@ export default function PackagesManager() {
   const handleToggleFeatured = async (pkg: Package) => {
     try {
       await updatePackage.mutateAsync({ id: pkg.id, payload: { is_featured: !pkg.is_featured } })
-      toast.success(pkg.is_featured ? 'Paquete ya no es destacado' : 'Paquete destacado')
+      toast.success(pkg.is_featured ? 'Paquete ya no es destacado' : 'Paquete destacado', {
+        description: pkg.is_featured
+          ? 'Se quitó de los paquetes destacados'
+          : 'Ahora aparece como destacado',
+      })
     } catch (error) {
-      toast.error('Error al actualizar destacado')
+      toast.error('Error al actualizar destacado', {
+        description: 'No se pudo actualizar el estado destacado. Intenta nuevamente.',
+      })
     }
   }
 
@@ -156,6 +168,8 @@ export default function PackagesManager() {
                             variant="ghost"
                             onClick={() => handleToggleFeatured(pkg)}
                             className="gap-1.5 px-2"
+                            title={pkg.is_featured ? 'Quitar de destacados' : 'Marcar como destacado'}
+                            aria-label={pkg.is_featured ? 'Quitar de destacados' : 'Marcar como destacado'}
                           >
                             {pkg.is_featured ? (
                               <Badge className="gap-1 bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/20">
@@ -174,6 +188,8 @@ export default function PackagesManager() {
                             onClick={() => handleToggleActive(pkg)}
                             disabled={togglingId === pkg.id}
                             className="gap-1.5 px-2"
+                            title={pkg.is_active ? 'Ocultar paquete del sitio público' : 'Mostrar paquete en el sitio público'}
+                            aria-label={pkg.is_active ? 'Ocultar paquete del sitio público' : 'Mostrar paquete en el sitio público'}
                           >
                             {togglingId === pkg.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -191,6 +207,8 @@ export default function PackagesManager() {
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => handleEdit(pkg)}
+                              title="Editar este paquete"
+                              aria-label="Editar este paquete"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -199,6 +217,8 @@ export default function PackagesManager() {
                               size="icon"
                               className="h-8 w-8 text-red-400 hover:text-red-300"
                               onClick={() => handleDelete(pkg.id, pkg.name)}
+                              title="Eliminar este paquete"
+                              aria-label="Eliminar este paquete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
