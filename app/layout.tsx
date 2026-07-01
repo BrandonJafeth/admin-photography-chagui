@@ -42,7 +42,7 @@ export default function RootLayout({
           position="top-right"
           theme="dark"
           options={{
-            fill: '#f8fafb',
+            fill: '#0f1416',
             roundness: 10,
             styles: {
               title: 'text-foreground!',

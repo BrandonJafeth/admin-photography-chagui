@@ -25,13 +25,10 @@ export interface UpdateServiceFaqPayload {
   is_active?: boolean
 }
 
-/**
- * Servicio para gestionar las preguntas frecuentes de un servicio
- */
+
 export class ServiceFaqsService {
-  /**
-   * Obtiene todas las FAQs de un servicio ordenadas
-   */
+
+
   static async getByServiceId(serviceId: string): Promise<ServiceFaq[]> {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -45,9 +42,7 @@ export class ServiceFaqsService {
     return data || []
   }
 
-  /**
-   * Crea una nueva FAQ
-   */
+ 
   static async create(payload: CreateServiceFaqPayload): Promise<ServiceFaq> {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -65,9 +60,7 @@ export class ServiceFaqsService {
     return data
   }
 
-  /**
-   * Actualiza una FAQ
-   */
+
   static async update(id: string, payload: UpdateServiceFaqPayload): Promise<ServiceFaq> {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -82,9 +75,6 @@ export class ServiceFaqsService {
     return data
   }
 
-  /**
-   * Elimina una FAQ
-   */
   static async delete(id: string): Promise<void> {
     const supabase = createClient()
     const { error } = await supabase
@@ -95,9 +85,6 @@ export class ServiceFaqsService {
     if (error) throw new Error(`Error al eliminar pregunta frecuente: ${error.message}`)
   }
 
-  /**
-   * Actualiza el orden de múltiples FAQs
-   */
   static async updateOrder(updates: Array<{ id: string; order: number }>): Promise<void> {
     const supabase = createClient()
     const promises = updates.map(({ id, order }) =>

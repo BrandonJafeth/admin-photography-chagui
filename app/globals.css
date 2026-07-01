@@ -151,3 +151,15 @@
 [data-sileo-viewport] {
   z-index: 200;
 }
+
+/* El autofill del navegador ignora el tema oscuro y pinta fondo claro con
+   texto claro (invisible). Forzamos el fondo/texto del input por debajo. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  -webkit-box-shadow: 0 0 0px 1000px #0d0d0d inset;
+  box-shadow: 0 0 0px 1000px #0d0d0d inset;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-in-out 0s;
+}
