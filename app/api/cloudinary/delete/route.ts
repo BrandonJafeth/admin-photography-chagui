@@ -84,11 +84,11 @@ export async function POST(request: NextRequest) {
     
     const timestamp = Math.round(new Date().getTime() / 1000)
 
-    // Generar firma SHA-1
+    // Generar firma SHA-256
     // Formato según documentación de Cloudinary:
-    // signature = SHA1(public_id={public_id}&timestamp={timestamp}{api_secret})
+    // signature = SHA256(public_id={public_id}&timestamp={timestamp}{api_secret})
     const message = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-    const signature = crypto.createHash('sha1').update(message).digest('hex')
+    const signature = crypto.createHash('sha256').update(message).digest('hex')
 
     const requestBody = {
       public_id: publicId,

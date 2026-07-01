@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useReducer } from 'react'
 import { toast } from '@/lib/toast'
 import { Package } from '@/services/packages.service'
 import { useCreatePackage, useUpdatePackage, usePackages } from '@/hooks/usePackages'
@@ -33,17 +33,40 @@ interface PackageSheetProps {
 
 const UNIVERSAL_VALUE = 'universal'
 
+type PackageFormState = {
+  serviceId: string
+  name: string
+  description: string
+  includes: string[]
+  isFeatured: boolean
+}
+
+type PackageFormAction =
+  | { type: 'fieldChanged'; name: 'serviceId' | 'name' | 'description'; value: string }
+  | { type: 'fieldChanged'; name: 'includes'; value: string[] }
+  | { type: 'fieldChanged'; name: 'isFeatured'; value: boolean }
+
+function packageFormReducer(state: PackageFormState, action: PackageFormAction): PackageFormState {
+  switch (action.type) {
+    case 'fieldChanged':
+      return { ...state, [action.name]: action.value }
+  }
+}
+
 export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
   const { data: services = [] } = useServices()
   const { data: packages = [] } = usePackages()
   const createPackage = useCreatePackage()
   const updatePackage = useUpdatePackage()
 
-  const [serviceId, setServiceId] = useState<string>(pkg?.service_id || UNIVERSAL_VALUE)
-  const [name, setName] = useState(pkg?.name || '')
-  const [description, setDescription] = useState(pkg?.description || '')
-  const [includes, setIncludes] = useState<string[]>(pkg?.includes || [])
-  const [isFeatured, setIsFeatured] = useState(pkg?.is_featured ?? false)
+  const [formState, dispatch] = useReducer(packageFormReducer, {
+    serviceId: pkg?.service_id || UNIVERSAL_VALUE,
+    name: pkg?.name || '',
+    description: pkg?.description || '',
+    includes: pkg?.includes || [],
+    isFeatured: pkg?.is_featured ?? false,
+  })
+  const { serviceId, name, description, includes, isFeatured } = formState
 
   const isPending = createPackage.isPending || updatePackage.isPending
 
@@ -102,7 +125,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
             <Input
               id="name"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => dispatch({ type: 'fieldChanged', name: 'name', value: e.target.value })}
               placeholder="Ej: Paquete Premium Bodas"
             />
             {name && name.length < 3 && (
@@ -112,7 +135,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
 
           <div className="space-y-2">
             <Label className="text-sm font-medium">Servicio</Label>
-            <Select value={serviceId} onValueChange={setServiceId}>
+            <Select value={serviceId} onValueChange={value => dispatch({ type: 'fieldChanged', name: 'serviceId', value })}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona un servicio" />
               </SelectTrigger>
@@ -133,7 +156,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
               id="description"
               aria-label="Descripción"
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => dispatch({ type: 'fieldChanged', name: 'description', value: e.target.value })}
               className="w-full min-h-[80px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
               placeholder="Breve descripción del paquete..."
             />
@@ -142,7 +165,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
           <StringListField
             label="Incluye"
             items={includes}
-            onChange={setIncludes}
+            onChange={value => dispatch({ type: 'fieldChanged', name: 'includes', value })}
             placeholder="Ej: 300 fotos editadas"
             disabled={isPending}
           />
@@ -156,7 +179,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
               type="button"
               variant={isFeatured ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setIsFeatured(!isFeatured)}
+              onClick={() => dispatch({ type: 'fieldChanged', name: 'isFeatured', value: !isFeatured })}
             >
               {isFeatured ? 'Destacado' : 'Normal'}
             </Button>

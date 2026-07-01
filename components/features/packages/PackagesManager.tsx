@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useReducer, useState } from 'react'
 import { toast } from '@/lib/toast'
 import { usePackages, useDeletePackage, useUpdatePackage } from '@/hooks/usePackages'
 import { useServices } from '@/hooks/useServices'
@@ -29,33 +29,67 @@ import {
 import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { PackageSheet } from './PackageSheet'
 
+type SheetState = { isOpen: boolean; editingPackage: Package | null }
+type SheetAction =
+  | { type: 'createRequested' }
+  | { type: 'editRequested'; pkg: Package }
+  | { type: 'openChanged'; open: boolean }
+
+function sheetReducer(state: SheetState, action: SheetAction): SheetState {
+  switch (action.type) {
+    case 'createRequested':
+      return { isOpen: true, editingPackage: null }
+    case 'editRequested':
+      return { isOpen: true, editingPackage: action.pkg }
+    case 'openChanged':
+      return { ...state, isOpen: action.open }
+  }
+}
+
+type DeleteDialogState = { isOpen: boolean; packageToDelete: { id: string; name: string } | null }
+type DeleteDialogAction =
+  | { type: 'deleteRequested'; id: string; name: string }
+  | { type: 'openChanged'; open: boolean }
+  | { type: 'deleteResolved' }
+
+function deleteDialogReducer(state: DeleteDialogState, action: DeleteDialogAction): DeleteDialogState {
+  switch (action.type) {
+    case 'deleteRequested':
+      return { isOpen: true, packageToDelete: { id: action.id, name: action.name } }
+    case 'openChanged':
+      return { ...state, isOpen: action.open }
+    case 'deleteResolved':
+      return { isOpen: false, packageToDelete: null }
+  }
+}
+
 export default function PackagesManager() {
   const { data: packages = [], isLoading } = usePackages()
   const { data: services = [] } = useServices()
   const deletePackage = useDeletePackage()
   const updatePackage = useUpdatePackage()
 
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const [editingPackage, setEditingPackage] = useState<Package | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [packageToDelete, setPackageToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingPackage: null })
+  const [deleteDialogState, dispatchDeleteDialog] = useReducer(deleteDialogReducer, {
+    isOpen: false,
+    packageToDelete: null,
+  })
+  const { isOpen: isSheetOpen, editingPackage } = sheetState
+  const { isOpen: deleteDialogOpen, packageToDelete } = deleteDialogState
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const serviceNameById = new Map(services.map(s => [s.id, s.title]))
 
   const handleCreate = () => {
-    setEditingPackage(null)
-    setIsSheetOpen(true)
+    dispatchSheet({ type: 'createRequested' })
   }
 
   const handleEdit = (pkg: Package) => {
-    setEditingPackage(pkg)
-    setIsSheetOpen(true)
+    dispatchSheet({ type: 'editRequested', pkg })
   }
 
   const handleDelete = (id: string, name: string) => {
-    setPackageToDelete({ id, name })
-    setDeleteDialogOpen(true)
+    dispatchDeleteDialog({ type: 'deleteRequested', id, name })
   }
 
   const confirmDelete = async () => {
@@ -72,8 +106,7 @@ export default function PackagesManager() {
         description: 'No se pudo eliminar el paquete. Intenta nuevamente.',
       })
     } finally {
-      setDeleteDialogOpen(false)
-      setPackageToDelete(null)
+      dispatchDeleteDialog({ type: 'deleteResolved' })
     }
   }
 
@@ -234,9 +267,17 @@ export default function PackagesManager() {
         </div>
       </div>
 
-      <PackageSheet key={editingPackage?.id ?? 'new'} pkg={editingPackage} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
+      <PackageSheet
+        key={editingPackage?.id ?? 'new'}
+        pkg={editingPackage}
+        isOpen={isSheetOpen}
+        onOpenChange={open => dispatchSheet({ type: 'openChanged', open })}
+      />
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={open => dispatchDeleteDialog({ type: 'openChanged', open })}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar paquete?</AlertDialogTitle>

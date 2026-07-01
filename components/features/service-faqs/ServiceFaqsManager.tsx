@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useReducer, useState } from 'react'
 import Link from 'next/link'
 import { toast } from '@/lib/toast'
 import { useServiceById } from '@/hooks/useServices'
@@ -38,6 +38,254 @@ interface ServiceFaqsManagerProps {
   serviceId: string
 }
 
+type SheetState = { isOpen: boolean; editingFaq: ServiceFaq | null }
+type SheetAction =
+  | { type: 'opened'; faq: ServiceFaq | null }
+  | { type: 'openChanged'; open: boolean }
+
+function sheetReducer(state: SheetState, action: SheetAction): SheetState {
+  switch (action.type) {
+    case 'opened':
+      return { isOpen: true, editingFaq: action.faq }
+    case 'openChanged':
+      return { ...state, isOpen: action.open, editingFaq: action.open ? state.editingFaq : null }
+  }
+}
+
+type DeleteDialogState = { isOpen: boolean; faqToDelete: { id: string; question: string } | null }
+type DeleteDialogAction =
+  | { type: 'requested'; id: string; question: string }
+  | { type: 'openChanged'; open: boolean }
+  | { type: 'resolved' }
+
+function deleteDialogReducer(state: DeleteDialogState, action: DeleteDialogAction): DeleteDialogState {
+  switch (action.type) {
+    case 'requested':
+      return { isOpen: true, faqToDelete: { id: action.id, question: action.question } }
+    case 'openChanged':
+      return { ...state, isOpen: action.open }
+    case 'resolved':
+      return { isOpen: false, faqToDelete: null }
+  }
+}
+
+interface FaqRowActionsProps {
+  faq: ServiceFaq
+  isToggling: boolean
+  onToggleActive: (faq: ServiceFaq) => void
+  onEdit: (faq: ServiceFaq) => void
+  onDelete: (id: string, question: string) => void
+}
+
+function FaqVisibilityToggle({ faq, isToggling, onToggleActive }: Pick<FaqRowActionsProps, 'faq' | 'isToggling' | 'onToggleActive'>) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={() => onToggleActive(faq)}
+      disabled={isToggling}
+      className="gap-1.5 px-2"
+      title={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
+      aria-label={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
+    >
+      {isToggling ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      ) : faq.is_active ? (
+        <Eye className="w-3.5 h-3.5 text-green-400" />
+      ) : (
+        <EyeOff className="w-3.5 h-3.5 text-white/40" />
+      )}
+    </Button>
+  )
+}
+
+interface FaqReorderControlsProps {
+  index: number
+  total: number
+  size: 'sm' | 'lg'
+  onMove: (index: number, direction: -1 | 1) => void
+}
+
+function FaqReorderControls({ index, total, size, onMove }: FaqReorderControlsProps) {
+  const buttonClass = size === 'sm' ? 'h-5 w-5' : 'h-7 w-7'
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={buttonClass}
+        disabled={index === 0}
+        onClick={() => onMove(index, -1)}
+        title="Mover pregunta hacia arriba"
+        aria-label="Mover pregunta hacia arriba"
+      >
+        <ArrowUp className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={buttonClass}
+        disabled={index === total - 1}
+        onClick={() => onMove(index, 1)}
+        title="Mover pregunta hacia abajo"
+        aria-label="Mover pregunta hacia abajo"
+      >
+        <ArrowDown className="h-3.5 w-3.5" />
+      </Button>
+    </>
+  )
+}
+
+interface FaqMobileListProps {
+  faqs: ServiceFaq[]
+  togglingId: string | null
+  onMove: (index: number, direction: -1 | 1) => void
+  onToggleActive: (faq: ServiceFaq) => void
+  onEdit: (faq: ServiceFaq) => void
+  onDelete: (id: string, question: string) => void
+}
+
+function FaqMobileList({ faqs, togglingId, onMove, onToggleActive, onEdit, onDelete }: FaqMobileListProps) {
+  return (
+    <div className="md:hidden space-y-3">
+      {faqs.map((faq, index) => (
+        <div
+          key={faq.id}
+          className="bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-0.5">
+              <FaqReorderControls index={index} total={faqs.length} size="lg" onMove={onMove} />
+            </div>
+            <div className="flex items-center gap-1">
+              <FaqVisibilityToggle faq={faq} isToggling={togglingId === faq.id} onToggleActive={onToggleActive} />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onEdit(faq)}
+                title="Editar esta pregunta"
+                aria-label="Editar esta pregunta"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-400 hover:text-red-300"
+                onClick={() => onDelete(faq.id, faq.question)}
+                title="Eliminar esta pregunta"
+                aria-label="Eliminar esta pregunta"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1 min-w-0">
+            <p className="font-medium text-white wrap-break-word">{faq.question}</p>
+            <p className="text-sm text-white/60 wrap-break-word line-clamp-3">{faq.answer}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+interface FaqTableProps {
+  faqs: ServiceFaq[]
+  togglingId: string | null
+  onMove: (index: number, direction: -1 | 1) => void
+  onToggleActive: (faq: ServiceFaq) => void
+  onEdit: (faq: ServiceFaq) => void
+  onDelete: (id: string, question: string) => void
+}
+
+function FaqTable({ faqs, togglingId, onMove, onToggleActive, onEdit, onDelete }: FaqTableProps) {
+  return (
+    <div className="hidden md:block bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-20">Orden</TableHead>
+            <TableHead>Pregunta</TableHead>
+            <TableHead>Respuesta</TableHead>
+            <TableHead>Activo</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {faqs.map((faq, index) => (
+            <TableRow key={faq.id}>
+              <TableCell>
+                <div className="flex flex-col gap-0.5">
+                  <FaqReorderControls index={index} total={faqs.length} size="sm" onMove={onMove} />
+                </div>
+              </TableCell>
+              <TableCell className="font-medium text-white max-w-xs truncate">{faq.question}</TableCell>
+              <TableCell className="text-white/60 max-w-sm truncate">{faq.answer}</TableCell>
+              <TableCell>
+                <FaqVisibilityToggle faq={faq} isToggling={togglingId === faq.id} onToggleActive={onToggleActive} />
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onEdit(faq)}
+                    title="Editar esta pregunta"
+                    aria-label="Editar esta pregunta"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-400 hover:text-red-300"
+                    onClick={() => onDelete(faq.id, faq.question)}
+                    title="Eliminar esta pregunta"
+                    aria-label="Eliminar esta pregunta"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+interface DeleteFaqDialogProps {
+  isOpen: boolean
+  question: string | undefined
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}
+
+function DeleteFaqDialog({ isOpen, question, onOpenChange, onConfirm }: DeleteFaqDialogProps) {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar pregunta?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {`Estás a punto de eliminar "${question}". Esta acción no se puede deshacer.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700 text-white">
+            Eliminar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProps) {
   const { data: service, isLoading: isLoadingService } = useServiceById(serviceId)
   const { data: faqs = [], isLoading: isLoadingFaqs } = useServiceFaqs(serviceId)
@@ -45,41 +293,35 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
   const updateFaq = useUpdateServiceFaq(serviceId)
   const updateOrder = useUpdateServiceFaqsOrder(serviceId)
 
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const [editingFaq, setEditingFaq] = useState<ServiceFaq | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [faqToDelete, setFaqToDelete] = useState<{ id: string; question: string } | null>(null)
+  const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingFaq: null })
+  const [deleteState, dispatchDelete] = useReducer(deleteDialogReducer, { isOpen: false, faqToDelete: null })
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const handleCreate = () => {
-    setEditingFaq(null)
-    setIsSheetOpen(true)
+    dispatchSheet({ type: 'opened', faq: null })
   }
 
   const handleEdit = (faq: ServiceFaq) => {
-    setEditingFaq(faq)
-    setIsSheetOpen(true)
+    dispatchSheet({ type: 'opened', faq })
   }
 
   const handleDelete = (id: string, question: string) => {
-    setFaqToDelete({ id, question })
-    setDeleteDialogOpen(true)
+    dispatchDelete({ type: 'requested', id, question })
   }
 
   const confirmDelete = async () => {
-    if (!faqToDelete) return
+    if (!deleteState.faqToDelete) return
     try {
-      await deleteFaq.mutateAsync(faqToDelete.id)
+      await deleteFaq.mutateAsync(deleteState.faqToDelete.id)
       toast.success('Pregunta eliminada', {
-        description: `"${faqToDelete.question}" se eliminó correctamente`,
+        description: `"${deleteState.faqToDelete.question}" se eliminó correctamente`,
       })
-    } catch (error) {
+    } catch {
       toast.error('Error al eliminar', {
         description: 'No se pudo eliminar la pregunta. Intenta nuevamente.',
       })
     } finally {
-      setDeleteDialogOpen(false)
-      setFaqToDelete(null)
+      dispatchDelete({ type: 'resolved' })
     }
   }
 
@@ -92,7 +334,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
           ? 'Ya no aparecerá en el sitio público'
           : 'Ahora es visible en el sitio público',
       })
-    } catch (error) {
+    } catch {
       toast.error('Error al cambiar visibilidad', {
         description: 'No se pudo actualizar la visibilidad. Intenta nuevamente.',
       })
@@ -113,7 +355,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
 
     try {
       await updateOrder.mutateAsync(updates)
-    } catch (error) {
+    } catch {
       toast.error('Error al reordenar', {
         description: 'No se pudo actualizar el orden. Intenta nuevamente.',
       })
@@ -161,200 +403,44 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
             ) : (
               <>
                 {/* Mobile: lista de tarjetas */}
-                <div className="md:hidden space-y-3">
-                  {faqs.map((faq, index) => (
-                    <div
-                      key={faq.id}
-                      className="bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 p-4 space-y-3"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            disabled={index === 0}
-                            onClick={() => handleMove(index, -1)}
-                            title="Mover pregunta hacia arriba"
-                            aria-label="Mover pregunta hacia arriba"
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            disabled={index === faqs.length - 1}
-                            onClick={() => handleMove(index, 1)}
-                            title="Mover pregunta hacia abajo"
-                            aria-label="Mover pregunta hacia abajo"
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleToggleActive(faq)}
-                            disabled={togglingId === faq.id}
-                            className="gap-1.5 px-2"
-                            title={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
-                            aria-label={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
-                          >
-                            {togglingId === faq.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : faq.is_active ? (
-                              <Eye className="w-3.5 h-3.5 text-green-400" />
-                            ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-white/40" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEdit(faq)}
-                            title="Editar esta pregunta"
-                            aria-label="Editar esta pregunta"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-400 hover:text-red-300"
-                            onClick={() => handleDelete(faq.id, faq.question)}
-                            title="Eliminar esta pregunta"
-                            aria-label="Eliminar esta pregunta"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-1 min-w-0">
-                        <p className="font-medium text-white wrap-break-word">{faq.question}</p>
-                        <p className="text-sm text-white/60 wrap-break-word line-clamp-3">{faq.answer}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <FaqMobileList
+                  faqs={faqs}
+                  togglingId={togglingId}
+                  onMove={handleMove}
+                  onToggleActive={handleToggleActive}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
 
                 {/* Desktop: tabla */}
-                <div className="hidden md:block bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-20">Orden</TableHead>
-                        <TableHead>Pregunta</TableHead>
-                        <TableHead>Respuesta</TableHead>
-                        <TableHead>Activo</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {faqs.map((faq, index) => (
-                        <TableRow key={faq.id}>
-                          <TableCell>
-                            <div className="flex flex-col gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                disabled={index === 0}
-                                onClick={() => handleMove(index, -1)}
-                                title="Mover pregunta hacia arriba"
-                                aria-label="Mover pregunta hacia arriba"
-                              >
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                disabled={index === faqs.length - 1}
-                                onClick={() => handleMove(index, 1)}
-                                title="Mover pregunta hacia abajo"
-                                aria-label="Mover pregunta hacia abajo"
-                              >
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium text-white max-w-xs truncate">{faq.question}</TableCell>
-                          <TableCell className="text-white/60 max-w-sm truncate">{faq.answer}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleToggleActive(faq)}
-                              disabled={togglingId === faq.id}
-                              className="gap-1.5 px-2"
-                              title={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
-                              aria-label={faq.is_active ? 'Ocultar pregunta del sitio público' : 'Mostrar pregunta en el sitio público'}
-                            >
-                              {togglingId === faq.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : faq.is_active ? (
-                                <Eye className="w-3.5 h-3.5 text-green-400" />
-                              ) : (
-                                <EyeOff className="w-3.5 h-3.5 text-white/40" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleEdit(faq)}
-                                title="Editar esta pregunta"
-                                aria-label="Editar esta pregunta"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-400 hover:text-red-300"
-                                onClick={() => handleDelete(faq.id, faq.question)}
-                                title="Eliminar esta pregunta"
-                                aria-label="Eliminar esta pregunta"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <FaqTable
+                  faqs={faqs}
+                  togglingId={togglingId}
+                  onMove={handleMove}
+                  onToggleActive={handleToggleActive}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
               </>
             )}
           </div>
         </div>
       </div>
 
-      <FaqSheet key={editingFaq?.id ?? 'new'} serviceId={serviceId} faq={editingFaq} isOpen={isSheetOpen} onOpenChange={setIsSheetOpen} />
+      <FaqSheet
+        key={sheetState.editingFaq?.id ?? 'new'}
+        serviceId={serviceId}
+        faq={sheetState.editingFaq}
+        isOpen={sheetState.isOpen}
+        onOpenChange={(open) => dispatchSheet({ type: 'openChanged', open })}
+      />
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar pregunta?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Estás a punto de eliminar "{faqToDelete?.question}". Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteFaqDialog
+        isOpen={deleteState.isOpen}
+        question={deleteState.faqToDelete?.question}
+        onOpenChange={(open) => dispatchDelete({ type: 'openChanged', open })}
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

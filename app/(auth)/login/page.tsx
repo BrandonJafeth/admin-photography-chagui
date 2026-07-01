@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useReducer, useState } from 'react'
 import { Eye, EyeOff, Camera, Mail, Lock } from 'lucide-react'
 import { useLogin } from '@/hooks/useLogin'
 import type { SignInPayload } from '@/services/auth.service'
@@ -9,30 +9,54 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+type FormState = { email: string; password: string; rememberMe: boolean }
+type FormAction =
+  | { type: 'fieldChanged'; name: keyof FormState; value: string | boolean }
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case 'fieldChanged':
+      return { ...state, [action.name]: action.value }
+  }
+}
+
+type SubmissionState = { loading: boolean; error: string | null }
+type SubmissionAction =
+  | { type: 'submitStarted' }
+  | { type: 'submitSucceeded' }
+  | { type: 'submitFailed'; error: string }
+
+function submissionReducer(state: SubmissionState, action: SubmissionAction): SubmissionState {
+  switch (action.type) {
+    case 'submitStarted':
+      return { loading: true, error: null }
+    case 'submitSucceeded':
+      return { loading: false, error: null }
+    case 'submitFailed':
+      return { loading: false, error: action.error }
+  }
+}
+
 export default function LoginPage() {
   const currentYear = new Date().getFullYear()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [form, dispatchForm] = useReducer(formReducer, { email: '', password: '', rememberMe: false })
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
 
   const { mutateAsync } = useLogin()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [submission, dispatchSubmission] = useReducer(submissionReducer, { loading: false, error: null })
+  const { loading, error } = submission
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
+    dispatchSubmission({ type: 'submitStarted' })
 
     try {
-      const payload: SignInPayload = { email, password, rememberMe }
+      const payload: SignInPayload = form
       await mutateAsync(payload)
+      dispatchSubmission({ type: 'submitSucceeded' })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      setError(message || 'Error al iniciar sesión')
-    } finally {
-      setLoading(false)
+      dispatchSubmission({ type: 'submitFailed', error: message || 'Error al iniciar sesión' })
     }
   }
 
@@ -77,8 +101,8 @@ export default function LoginPage() {
                     id="email"
                     type="email"
                     placeholder="admin@gadeaiso.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={form.email}
+                    onChange={(e) => dispatchForm({ type: 'fieldChanged', name: 'email', value: e.target.value })}
                     required
                     autoComplete="email"
                     className="h-[52px] pl-11 pr-4 text-[15px] rounded-xl"
@@ -97,8 +121,8 @@ export default function LoginPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={form.password}
+                    onChange={(e) => dispatchForm({ type: 'fieldChanged', name: 'password', value: e.target.value })}
                     required
                     autoComplete="current-password"
                     className="h-[52px] pl-11 pr-12 text-[15px] rounded-xl"
@@ -123,8 +147,8 @@ export default function LoginPage() {
                 <label className="flex items-center gap-2.5 cursor-pointer group">
                   <input
                     type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    checked={form.rememberMe}
+                    onChange={(e) => dispatchForm({ type: 'fieldChanged', name: 'rememberMe', value: e.target.checked })}
                     className="w-[18px] h-[18px] rounded-md border border-white/15 bg-[#0d0d0d] accent-white cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-white/10"
                   />
                   <span className="text-sm text-[#999999] group-hover:text-white/90 transition-colors select-none">

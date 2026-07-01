@@ -274,15 +274,15 @@ async function generateCloudinarySignature(
   timestamp: number,
   apiSecret: string
 ): Promise<string> {
-  // Cloudinary usa SHA-1 para generar la firma
-  // signature = SHA1(public_id + timestamp + api_secret)
+  // Cloudinary usa SHA-256 para generar la firma
+  // signature = SHA256(public_id + timestamp + api_secret)
   const message = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-  
+
   // Usar Web Crypto API (disponible en navegador y Node.js 15+)
   if (typeof crypto !== 'undefined' && crypto.subtle) {
     const encoder = new TextEncoder()
     const data = encoder.encode(message)
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     return hashHex

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git stash *)",
+      "Bash(npm run *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

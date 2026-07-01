@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useReducer, useState } from 'react'
 import Image from 'next/image'
 import { Service } from '@/services/services.service'
 import { useDeleteService, useUpdateService, useUpdateServicesOrder } from '@/hooks/useServices'
@@ -25,25 +25,296 @@ interface ServicesGridProps {
   isReordering: boolean
 }
 
+type DragState = { draggedId: string | null; dragPosition: { x: number; y: number } }
+type DragAction =
+  | { type: 'dragStarted'; id: string; x: number; y: number }
+  | { type: 'dragMoved'; x: number; y: number }
+  | { type: 'dragEnded' }
+
+function dragReducer(state: DragState, action: DragAction): DragState {
+  switch (action.type) {
+    case 'dragStarted':
+      return { draggedId: action.id, dragPosition: { x: action.x, y: action.y } }
+    case 'dragMoved':
+      return { ...state, dragPosition: { x: action.x, y: action.y } }
+    case 'dragEnded':
+      return { ...state, draggedId: null }
+  }
+}
+
+type EditSheetState = { editingId: string | null; isSheetOpen: boolean }
+type EditSheetAction =
+  | { type: 'editRequested'; id: string }
+  | { type: 'openChanged'; open: boolean }
+  | { type: 'closed' }
+
+function editSheetReducer(state: EditSheetState, action: EditSheetAction): EditSheetState {
+  switch (action.type) {
+    case 'editRequested':
+      return { editingId: action.id, isSheetOpen: true }
+    case 'openChanged':
+      return { ...state, isSheetOpen: action.open }
+    case 'closed':
+      return { editingId: null, isSheetOpen: false }
+  }
+}
+
+type DeleteDialogState = { deleteDialogOpen: boolean; serviceToDelete: { id: string; title: string } | null }
+type DeleteDialogAction =
+  | { type: 'deleteRequested'; id: string; title: string }
+  | { type: 'openChanged'; open: boolean }
+  | { type: 'resolved' }
+
+function deleteDialogReducer(state: DeleteDialogState, action: DeleteDialogAction): DeleteDialogState {
+  switch (action.type) {
+    case 'deleteRequested':
+      return { deleteDialogOpen: true, serviceToDelete: { id: action.id, title: action.title } }
+    case 'openChanged':
+      return { ...state, deleteDialogOpen: action.open }
+    case 'resolved':
+      return { deleteDialogOpen: false, serviceToDelete: null }
+  }
+}
+
+interface DraggedServicePreviewProps {
+  service: Service
+  position: { x: number; y: number }
+}
+
+function DraggedServicePreview({ service, position }: DraggedServicePreviewProps) {
+  return (
+    <div
+      className="fixed pointer-events-none z-[9999] opacity-90"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        transform: 'translate(-50%, -50%)',
+        width: '300px',
+      }}
+    >
+      <div className="rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl">
+        <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
+          {service.image ? (
+            <Image
+              src={service.image}
+              alt={service.title}
+              fill
+              sizes="300px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-white/5">
+              <span className="text-white/40 text-sm">Sin imagen</span>
+            </div>
+          )}
+        </div>
+        <div className="p-3">
+          <h3 className="text-sm font-bold text-white truncate">{service.title}</h3>
+          <p className="text-xs text-white/50 truncate">/{service.slug}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface ServiceCardProps {
+  service: Service
+  index: number
+  isReordering: boolean
+  isDragged: boolean
+  isToggling: boolean
+  onDragStart: (id: string, e: React.DragEvent) => void
+  onDrag: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (id: string) => void
+  onDragEnd: () => void
+  onToggleVisibility: (id: string, isVisible: boolean) => void
+  onEdit: (id: string) => void
+  onDelete: (id: string, title: string) => void
+}
+
+function ServiceCard({
+  service,
+  index,
+  isReordering,
+  isDragged,
+  isToggling,
+  onDragStart,
+  onDrag,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onToggleVisibility,
+  onEdit,
+  onDelete,
+}: ServiceCardProps) {
+  return (
+    <div
+      draggable={isReordering}
+      onDragStart={(e) => onDragStart(service.id, e)}
+      onDrag={onDrag}
+      onDragOver={onDragOver}
+      onDrop={() => onDrop(service.id)}
+      onDragEnd={onDragEnd}
+      className={`relative group rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 shadow-md hover:shadow-xl transition-all ${isReordering ? 'cursor-move' : 'cursor-default'} ${isDragged
+        ? 'ring-4 ring-white/40 shadow-2xl scale-105'
+        : 'hover:scale-[1.02]'
+        }`}
+    >
+      {/* Imagen */}
+      <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
+        {service.image ? (
+          <Image
+            src={service.image}
+            alt={service.title}
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="object-cover"
+            priority={index < 3}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-white/5">
+            <span className="text-white/40 text-sm">Sin imagen</span>
+          </div>
+        )}
+
+        {!isReordering && (
+          <div className="absolute top-3 right-3">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${service.is_active
+              ? 'bg-green-500 text-white'
+              : 'bg-white/20 text-white'
+              }`}>
+              {service.is_active ? 'Activo' : 'Inactivo'}
+            </span>
+          </div>
+        )}
+
+        {isReordering && (
+          <div className="absolute top-2 left-2 bg-white text-black p-2 rounded cursor-move shadow-lg">
+            <GripVertical className="w-4 h-4" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-5 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-bold text-white mb-1">{service.title}</h3>
+            <p className="text-xs text-white/50 font-medium">/{service.slug}</p>
+          </div>
+          {isReordering && (
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-semibold text-white bg-white/10 px-2 py-1 rounded">
+                #{index + 1}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <p className="text-sm text-white/60 line-clamp-2 min-h-[2.5rem]">
+          {service.description}
+        </p>
+
+        {!isReordering && (
+          <div className="flex gap-2 pt-3 border-t border-white/10">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onToggleVisibility(service.id, service.is_active)}
+              className="flex-1 gap-1.5 text-xs"
+              title={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
+              aria-label={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
+              disabled={isToggling}
+            >
+              {isToggling ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : service.is_active ? (
+                <Eye className="w-3.5 h-3.5" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              {isToggling ? '...' : service.is_active ? 'Ocultar' : 'Mostrar'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit(service.id)}
+              className="flex-1 gap-1.5 text-xs"
+              title="Editar este servicio"
+              aria-label="Editar este servicio"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Editar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => onDelete(service.id, service.title)}
+              className="gap-1.5 text-xs"
+              title="Eliminar este servicio"
+              aria-label="Eliminar este servicio"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
+interface DeleteServiceDialogProps {
+  open: boolean
+  serviceTitle: string | undefined
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}
+
+function DeleteServiceDialog({ open, serviceTitle, onOpenChange, onConfirm }: DeleteServiceDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estás a punto de eliminar "{serviceTitle}". Esta acción no se puede deshacer y también eliminará sus preguntas frecuentes.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Eliminar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
-  const [draggedId, setDraggedId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [serviceToDelete, setServiceToDelete] = useState<{ id: string; title: string } | null>(null)
+  const [dragState, dispatchDrag] = useReducer(dragReducer, { draggedId: null, dragPosition: { x: 0, y: 0 } })
+  const [editSheetState, dispatchEditSheet] = useReducer(editSheetReducer, { editingId: null, isSheetOpen: false })
+  const [deleteDialogState, dispatchDeleteDialog] = useReducer(deleteDialogReducer, { deleteDialogOpen: false, serviceToDelete: null })
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const deleteService = useDeleteService()
   const updateService = useUpdateService()
   const updateOrder = useUpdateServicesOrder()
 
+  const { draggedId, dragPosition } = dragState
+  const { editingId, isSheetOpen } = editSheetState
+  const { deleteDialogOpen, serviceToDelete } = deleteDialogState
+
   const editingService = services.find(svc => svc.id === editingId)
 
   const handleDragStart = (id: string, e: React.DragEvent) => {
     if (!isReordering) return
-    setDraggedId(id)
-    setDragPosition({ x: e.clientX, y: e.clientY })
+    dispatchDrag({ type: 'dragStarted', id, x: e.clientX, y: e.clientY })
 
     const ghost = document.createElement('div')
     ghost.style.opacity = '0'
@@ -53,7 +324,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
 
   const handleDrag = (e: React.DragEvent) => {
     if (!isReordering || e.clientX === 0 || e.clientY === 0) return
-    setDragPosition({ x: e.clientX, y: e.clientY })
+    dispatchDrag({ type: 'dragMoved', x: e.clientX, y: e.clientY })
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -62,12 +333,12 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
   }
 
   const handleDragEnd = () => {
-    setDraggedId(null)
+    dispatchDrag({ type: 'dragEnded' })
   }
 
   const handleDrop = async (targetId: string) => {
     if (!isReordering || !draggedId || draggedId === targetId) {
-      setDraggedId(null)
+      dispatchDrag({ type: 'dragEnded' })
       return
     }
 
@@ -75,7 +346,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
     const targetIndex = services.findIndex(svc => svc.id === targetId)
 
     if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedId(null)
+      dispatchDrag({ type: 'dragEnded' })
       return
     }
 
@@ -100,7 +371,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
       })
     }
 
-    setDraggedId(null)
+    dispatchDrag({ type: 'dragEnded' })
   }
 
   const handleToggleVisibility = async (id: string, isVisible: boolean) => {
@@ -123,9 +394,12 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
     }
   }
 
+  const handleEdit = (id: string) => {
+    dispatchEditSheet({ type: 'editRequested', id })
+  }
+
   const handleDelete = (id: string, title: string) => {
-    setServiceToDelete({ id, title })
-    setDeleteDialogOpen(true)
+    dispatchDeleteDialog({ type: 'deleteRequested', id, title })
   }
 
   const confirmDelete = async () => {
@@ -148,8 +422,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
         description: 'No se pudo eliminar el servicio. Intenta nuevamente.',
       })
     } finally {
-      setDeleteDialogOpen(false)
-      setServiceToDelete(null)
+      dispatchDeleteDialog({ type: 'resolved' })
     }
   }
 
@@ -158,158 +431,27 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
   return (
     <>
       {draggedId && draggedService && (
-        <div
-          className="fixed pointer-events-none z-[9999] opacity-90"
-          style={{
-            left: `${dragPosition.x}px`,
-            top: `${dragPosition.y}px`,
-            transform: 'translate(-50%, -50%)',
-            width: '300px',
-          }}
-        >
-          <div className="rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl">
-            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
-              {draggedService.image ? (
-                <Image
-                  src={draggedService.image}
-                  alt={draggedService.title}
-                  fill
-                  sizes="300px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  <span className="text-white/40 text-sm">Sin imagen</span>
-                </div>
-              )}
-            </div>
-            <div className="p-3">
-              <h3 className="text-sm font-bold text-white truncate">{draggedService.title}</h3>
-              <p className="text-xs text-white/50 truncate">/{draggedService.slug}</p>
-            </div>
-          </div>
-        </div>
+        <DraggedServicePreview service={draggedService} position={dragPosition} />
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {services.map((service, index) => (
-          <div
+          <ServiceCard
             key={service.id}
-            draggable={isReordering}
-            onDragStart={(e) => handleDragStart(service.id, e)}
+            service={service}
+            index={index}
+            isReordering={isReordering}
+            isDragged={draggedId === service.id}
+            isToggling={togglingId === service.id}
+            onDragStart={handleDragStart}
             onDrag={handleDrag}
             onDragOver={handleDragOver}
-            onDrop={() => handleDrop(service.id)}
+            onDrop={handleDrop}
             onDragEnd={handleDragEnd}
-            className={`relative group rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 shadow-md hover:shadow-xl transition-all ${isReordering ? 'cursor-move' : 'cursor-default'} ${draggedId === service.id
-              ? 'ring-4 ring-white/40 shadow-2xl scale-105'
-              : 'hover:scale-[1.02]'
-              }`}
-          >
-            {/* Imagen */}
-            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
-              {service.image ? (
-                <Image
-                  src={service.image}
-                  alt={service.title}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  className="object-cover"
-                  priority={index < 3}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  <span className="text-white/40 text-sm">Sin imagen</span>
-                </div>
-              )}
-
-              {!isReordering && (
-                <div className="absolute top-3 right-3">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${service.is_active
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white/20 text-white'
-                    }`}>
-                    {service.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-              )}
-
-              {isReordering && (
-                <div className="absolute top-2 left-2 bg-white text-black p-2 rounded cursor-move shadow-lg">
-                  <GripVertical className="w-4 h-4" />
-                </div>
-              )}
-            </div>
-
-            {/* Info */}
-            <div className="p-5 space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-bold text-white mb-1">{service.title}</h3>
-                  <p className="text-xs text-white/50 font-medium">/{service.slug}</p>
-                </div>
-                {isReordering && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold text-white bg-white/10 px-2 py-1 rounded">
-                      #{index + 1}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <p className="text-sm text-white/60 line-clamp-2 min-h-[2.5rem]">
-                {service.description}
-              </p>
-
-              {!isReordering && (
-                <div className="flex gap-2 pt-3 border-t border-white/10">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleToggleVisibility(service.id, service.is_active)}
-                    className="flex-1 gap-1.5 text-xs"
-                    title={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
-                    aria-label={service.is_active ? 'Ocultar servicio del sitio público' : 'Mostrar servicio en el sitio público'}
-                    disabled={togglingId === service.id}
-                  >
-                    {togglingId === service.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : service.is_active ? (
-                      <Eye className="w-3.5 h-3.5" />
-                    ) : (
-                      <EyeOff className="w-3.5 h-3.5" />
-                    )}
-                    {togglingId === service.id ? '...' : service.is_active ? 'Ocultar' : 'Mostrar'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingId(service.id)
-                      setIsSheetOpen(true)
-                    }}
-                    className="flex-1 gap-1.5 text-xs"
-                    title="Editar este servicio"
-                    aria-label="Editar este servicio"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(service.id, service.title)}
-                    className="gap-1.5 text-xs"
-                    title="Eliminar este servicio"
-                    aria-label="Eliminar este servicio"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              )}
-
-            </div>
-          </div>
+            onToggleVisibility={handleToggleVisibility}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         ))}
       </div>
 
@@ -318,33 +460,17 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
           key={editingService.id}
           service={editingService}
           isOpen={isSheetOpen}
-          onOpenChange={setIsSheetOpen}
-          onClose={() => {
-            setIsSheetOpen(false)
-            setEditingId(null)
-          }}
+          onOpenChange={(open) => dispatchEditSheet({ type: 'openChanged', open })}
+          onClose={() => dispatchEditSheet({ type: 'closed' })}
         />
       )}
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Estás a punto de eliminar "{serviceToDelete?.title}". Esta acción no se puede deshacer y también eliminará sus preguntas frecuentes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteServiceDialog
+        open={deleteDialogOpen}
+        serviceTitle={serviceToDelete?.title}
+        onOpenChange={(open) => dispatchDeleteDialog({ type: 'openChanged', open })}
+        onConfirm={confirmDelete}
+      />
     </>
   )
 }

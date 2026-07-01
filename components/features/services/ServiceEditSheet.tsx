@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useReducer, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Service } from '@/services/services.service'
@@ -27,22 +27,253 @@ interface ServiceEditSheetProps {
   onClose: () => void
 }
 
+type FormState = {
+  title: string
+  slug: string
+  description: string
+  detailedDescription: string
+}
+
+type FormAction = {
+  type: 'fieldChanged'
+  name: keyof FormState
+  value: string
+}
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case 'fieldChanged':
+      return { ...state, [action.name]: action.value }
+  }
+}
+
+type UploadState = {
+  isUploading: boolean
+  uploadError: string | null
+}
+
+type UploadAction =
+  | { type: 'uploadStarted' }
+  | { type: 'uploadFailed'; error: string }
+  | { type: 'uploadFinished' }
+
+function uploadReducer(state: UploadState, action: UploadAction): UploadState {
+  switch (action.type) {
+    case 'uploadStarted':
+      return { isUploading: true, uploadError: null }
+    case 'uploadFailed':
+      return { isUploading: false, uploadError: action.error }
+    case 'uploadFinished':
+      return { ...state, isUploading: false }
+  }
+}
+
+function hasValidationErrors(form: FormState): boolean {
+  if (!form.title || form.title.length < 3 || form.title.length > 200) return true
+  if (
+    !form.slug ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) ||
+    form.slug.startsWith('-') ||
+    form.slug.endsWith('-')
+  )
+    return true
+  if (!form.description || form.description.length < 20 || form.description.length > 2000)
+    return true
+  return false
+}
+
+interface ImagePreviewUploadProps {
+  service: Service
+  isUploading: boolean
+  uploadError: string | null
+  onFileSelected: (e: React.ChangeEvent<HTMLInputElement>) => void
+}
+
+function ImagePreviewUpload({
+  service,
+  isUploading,
+  uploadError,
+  onFileSelected,
+}: ImagePreviewUploadProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label className="text-sm font-semibold">Vista Previa</Label>
+        <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
+          {service.image ? (
+            <Image
+              src={service.image}
+              alt={service.title}
+              fill
+              sizes="(min-width: 640px) 42rem, 100vw"
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-white/5">
+              <span className="text-white/40">Sin imagen</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 border-t border-white/10 pt-6">
+        <Label className="text-sm font-medium">Cambiar Imagen</Label>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            aria-label="Seleccionar imagen"
+            onChange={onFileSelected}
+            disabled={isUploading}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full gap-2"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Subiendo...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Seleccionar Imagen
+              </>
+            )}
+          </Button>
+        </div>
+        {uploadError && (
+          <p className="text-xs text-red-400">{uploadError}</p>
+        )}
+        <p className="text-xs text-white/40">
+          Formatos: JPEG, PNG, WebP, GIF • Máximo: 5MB
+        </p>
+      </div>
+    </>
+  )
+}
+
+interface ServiceFormFieldsProps {
+  form: FormState
+  onFieldChange: (name: keyof FormState, value: string) => void
+}
+
+function ServiceFormFields({ form, onFieldChange }: ServiceFormFieldsProps) {
+  return (
+    <>
+      <div className="space-y-2 border-t border-white/10 pt-6">
+        <Label htmlFor="title" className="text-sm font-medium">
+          Título <span className="text-red-400">*</span>
+        </Label>
+        <Input
+          id="title"
+          value={form.title}
+          onChange={e => onFieldChange('title', e.target.value)}
+          placeholder="Ej: BODAS"
+        />
+        {form.title && form.title.length < 3 && (
+          <p className="text-xs text-amber-400">El título debe tener al menos 3 caracteres</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="slug" className="text-sm font-medium">
+          Slug (URL) <span className="text-red-400">*</span>
+        </Label>
+        <Input
+          id="slug"
+          value={form.slug}
+          onChange={e => onFieldChange('slug', e.target.value.toLowerCase())}
+          placeholder="Ej: bodas"
+          className="font-mono text-sm"
+        />
+        {form.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) && (
+          <p className="text-xs text-red-400">
+            Solo letras minúsculas, números y guiones (ejemplo: fotografia-bodas)
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description" className="text-sm font-medium">
+          Descripción <span className="text-red-400">*</span> ({form.description.length}/2000)
+        </Label>
+        <textarea
+          id="description"
+          aria-label="Descripción"
+          value={form.description}
+          onChange={e => onFieldChange('description', e.target.value)}
+          className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
+          placeholder="Describe el servicio de manera clara y concisa..."
+        />
+        {form.description && form.description.length < 20 && (
+          <p className="text-xs text-amber-400">La descripción debe tener al menos 20 caracteres</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="detailedDescription" className="text-sm font-medium">
+          Descripción Detallada (opcional)
+        </Label>
+        <textarea
+          id="detailedDescription"
+          aria-label="Descripción Detallada"
+          value={form.detailedDescription}
+          onChange={e => onFieldChange('detailedDescription', e.target.value)}
+          className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
+          placeholder="Información ampliada que se muestra en la página del servicio..."
+        />
+      </div>
+    </>
+  )
+}
+
+interface ServiceMetadataProps {
+  service: Service
+}
+
+function ServiceMetadata({ service }: ServiceMetadataProps) {
+  return (
+    <div className="space-y-1 border-t border-white/10 pt-6 text-xs text-white/40">
+      <p>Creado: {new Date(service.created_at).toLocaleDateString()}</p>
+      <p>Actualizado: {new Date(service.updated_at).toLocaleDateString()}</p>
+      <p>Estado: {service.is_active ? 'Visible' : 'Oculto'}</p>
+    </div>
+  )
+}
+
 export function ServiceEditSheet({
   service,
   isOpen,
   onOpenChange,
   onClose,
 }: ServiceEditSheetProps) {
-  const [title, setTitle] = useState(service.title)
-  const [slug, setSlug] = useState(service.slug)
-  const [description, setDescription] = useState(service.description)
-  const [detailedDescription, setDetailedDescription] = useState(service.detailed_description || '')
+  const [form, dispatchForm] = useReducer(formReducer, {
+    title: service.title,
+    slug: service.slug,
+    description: service.description,
+    detailedDescription: service.detailed_description || '',
+  })
   const [features, setFeatures] = useState<string[]>(service.features || [])
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [upload, dispatchUpload] = useReducer(uploadReducer, {
+    isUploading: false,
+    uploadError: null,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const updateService = useUpdateService()
+
+  const handleFieldChange = (name: keyof FormState, value: string) => {
+    dispatchForm({ type: 'fieldChanged', name, value })
+  }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -50,12 +281,11 @@ export function ServiceEditSheet({
 
     const validationError = getImageValidationError(file)
     if (validationError) {
-      setUploadError(validationError)
+      dispatchUpload({ type: 'uploadFailed', error: validationError })
       return
     }
 
-    setUploadError(null)
-    setIsUploading(true)
+    dispatchUpload({ type: 'uploadStarted' })
 
     try {
       const result = await uploadToCloudinary(file, 'photographic-images/services')
@@ -70,31 +300,36 @@ export function ServiceEditSheet({
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
+      dispatchUpload({ type: 'uploadFinished' })
     } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : 'Error al subir la imagen'
-      )
-    } finally {
-      setIsUploading(false)
+      dispatchUpload({
+        type: 'uploadFailed',
+        error: error instanceof Error ? error.message : 'Error al subir la imagen',
+      })
     }
   }
 
   const handleSave = async () => {
-    if (!title || title.length < 3 || title.length > 200) {
+    if (!form.title || form.title.length < 3 || form.title.length > 200) {
       toast.error('Error de validación', {
         description: 'El título debe tener entre 3 y 200 caracteres',
       })
       return
     }
 
-    if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.startsWith('-') || slug.endsWith('-')) {
+    if (
+      !form.slug ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) ||
+      form.slug.startsWith('-') ||
+      form.slug.endsWith('-')
+    ) {
       toast.error('Error de validación', {
         description: 'El slug debe ser válido (solo letras minúsculas, números y guiones)',
       })
       return
     }
 
-    if (!description || description.length < 20 || description.length > 2000) {
+    if (!form.description || form.description.length < 20 || form.description.length > 2000) {
       toast.error('Error de validación', {
         description: 'La descripción debe tener entre 20 y 2000 caracteres',
       })
@@ -105,10 +340,10 @@ export function ServiceEditSheet({
       await updateService.mutateAsync({
         id: service.id,
         payload: {
-          title,
-          slug,
-          description,
-          detailed_description: detailedDescription || undefined,
+          title: form.title,
+          slug: form.slug,
+          description: form.description,
+          detailed_description: form.detailedDescription || undefined,
           features: features.filter(f => f.trim().length > 0),
         },
       })
@@ -124,11 +359,17 @@ export function ServiceEditSheet({
     }
   }
 
-  const hasValidationErrors = () => {
-    if (!title || title.length < 3 || title.length > 200) return true
-    if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.startsWith('-') || slug.endsWith('-')) return true
-    if (!description || description.length < 20 || description.length > 2000) return true
-    return false
+  const handleCancel = () => {
+    dispatchForm({ type: 'fieldChanged', name: 'title', value: service.title })
+    dispatchForm({ type: 'fieldChanged', name: 'slug', value: service.slug })
+    dispatchForm({ type: 'fieldChanged', name: 'description', value: service.description })
+    dispatchForm({
+      type: 'fieldChanged',
+      name: 'detailedDescription',
+      value: service.detailed_description || '',
+    })
+    setFeatures(service.features || [])
+    onClose()
   }
 
   return (
@@ -144,134 +385,14 @@ export function ServiceEditSheet({
         </div>
 
         <div className="px-6 py-6 space-y-8">
-          {/* Preview */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Vista Previa</Label>
-            <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
-              {service.image ? (
-                <Image
-                  src={service.image}
-                  alt={service.title}
-                  fill
-                  sizes="(min-width: 640px) 42rem, 100vw"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  <span className="text-white/40">Sin imagen</span>
-                </div>
-              )}
-            </div>
-          </div>
+          <ImagePreviewUpload
+            service={service}
+            isUploading={upload.isUploading}
+            uploadError={upload.uploadError}
+            onFileSelected={handleImageUpload}
+          />
 
-          {/* Upload Nueva Imagen */}
-          <div className="space-y-2 border-t border-white/10 pt-6">
-            <Label className="text-sm font-medium">Cambiar Imagen</Label>
-            <div className="flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                aria-label="Seleccionar imagen"
-                onChange={handleImageUpload}
-                disabled={isUploading}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full gap-2"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Subiendo...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Seleccionar Imagen
-                  </>
-                )}
-              </Button>
-            </div>
-            {uploadError && (
-              <p className="text-xs text-red-400">{uploadError}</p>
-            )}
-            <p className="text-xs text-white/40">
-              Formatos: JPEG, PNG, WebP, GIF • Máximo: 5MB
-            </p>
-          </div>
-
-          {/* Título */}
-          <div className="space-y-2 border-t border-white/10 pt-6">
-            <Label htmlFor="title" className="text-sm font-medium">
-              Título <span className="text-red-400">*</span>
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Ej: BODAS"
-            />
-            {title && title.length < 3 && (
-              <p className="text-xs text-amber-400">El título debe tener al menos 3 caracteres</p>
-            )}
-          </div>
-
-          {/* Slug */}
-          <div className="space-y-2">
-            <Label htmlFor="slug" className="text-sm font-medium">
-              Slug (URL) <span className="text-red-400">*</span>
-            </Label>
-            <Input
-              id="slug"
-              value={slug}
-              onChange={e => setSlug(e.target.value.toLowerCase())}
-              placeholder="Ej: bodas"
-              className="font-mono text-sm"
-            />
-            {slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && (
-              <p className="text-xs text-red-400">
-                Solo letras minúsculas, números y guiones (ejemplo: fotografia-bodas)
-              </p>
-            )}
-          </div>
-
-          {/* Descripción */}
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium">
-              Descripción <span className="text-red-400">*</span> ({description.length}/2000)
-            </Label>
-            <textarea
-              id="description"
-              aria-label="Descripción"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
-              placeholder="Describe el servicio de manera clara y concisa..."
-            />
-            {description && description.length < 20 && (
-              <p className="text-xs text-amber-400">La descripción debe tener al menos 20 caracteres</p>
-            )}
-          </div>
-
-          {/* Descripción detallada */}
-          <div className="space-y-2">
-            <Label htmlFor="detailedDescription" className="text-sm font-medium">
-              Descripción Detallada (opcional)
-            </Label>
-            <textarea
-              id="detailedDescription"
-              aria-label="Descripción Detallada"
-              value={detailedDescription}
-              onChange={e => setDetailedDescription(e.target.value)}
-              className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
-              placeholder="Información ampliada que se muestra en la página del servicio..."
-            />
-          </div>
+          <ServiceFormFields form={form} onFieldChange={handleFieldChange} />
 
           {/* Features */}
           <div className="border-t border-white/10 pt-6">
@@ -294,14 +415,9 @@ export function ServiceEditSheet({
             </Link>
           </div>
 
-          {/* Metadata */}
-          <div className="space-y-1 border-t border-white/10 pt-6 text-xs text-white/40">
-            <p>Creado: {new Date(service.created_at).toLocaleDateString()}</p>
-            <p>Actualizado: {new Date(service.updated_at).toLocaleDateString()}</p>
-            <p>Estado: {service.is_active ? 'Visible' : 'Oculto'}</p>
-          </div>
+          <ServiceMetadata service={service} />
 
-          {hasValidationErrors() && (
+          {hasValidationErrors(form) && (
             <div className="text-sm text-amber-400 flex items-center gap-2 -mt-4">
               <span className="w-2 h-2 bg-amber-400 rounded-full" />
               Por favor corrige los errores antes de guardar
@@ -313,7 +429,7 @@ export function ServiceEditSheet({
             <Button
               type="submit"
               onClick={handleSave}
-              disabled={updateService.isPending || hasValidationErrors()}
+              disabled={updateService.isPending || hasValidationErrors(form)}
               className="flex-1 h-11"
             >
               {updateService.isPending ? (
@@ -329,14 +445,7 @@ export function ServiceEditSheet({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setTitle(service.title)
-                setSlug(service.slug)
-                setDescription(service.description)
-                setDetailedDescription(service.detailed_description || '')
-                setFeatures(service.features || [])
-                onClose()
-              }}
+              onClick={handleCancel}
               className="h-11"
             >
               Cancelar
