@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { ServiceFaq } from '@/services/service-faqs.service'
 import { useCreateServiceFaq, useUpdateServiceFaq, useServiceFaqs } from '@/hooks/useServiceFaqs'
 import { Button } from '@/components/ui/button'

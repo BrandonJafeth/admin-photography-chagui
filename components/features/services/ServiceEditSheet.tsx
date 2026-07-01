@@ -17,7 +17,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Upload, Loader2, MessageCircleQuestion } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 interface ServiceEditSheetProps {
   service: Service

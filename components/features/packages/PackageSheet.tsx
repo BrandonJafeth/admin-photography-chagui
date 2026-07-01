@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Package } from '@/services/packages.service'
 import { useCreatePackage, useUpdatePackage, usePackages } from '@/hooks/usePackages'
 import { useServices } from '@/hooks/useServices'
@@ -41,7 +41,6 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
 
   const [serviceId, setServiceId] = useState<string>(UNIVERSAL_VALUE)
   const [name, setName] = useState('')
-  const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
   const [includes, setIncludes] = useState<string[]>([])
   const [isFeatured, setIsFeatured] = useState(false)
@@ -50,7 +49,6 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
     if (isOpen) {
       setServiceId(pkg?.service_id || UNIVERSAL_VALUE)
       setName(pkg?.name || '')
-      setPrice(pkg ? String(pkg.price) : '')
       setDescription(pkg?.description || '')
       setIncludes(pkg?.includes || [])
       setIsFeatured(pkg?.is_featured ?? false)
@@ -61,8 +59,6 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
 
   const hasValidationErrors = () => {
     if (!name || name.length < 3 || name.length > 200) return true
-    const priceNum = Number(price)
-    if (!price || isNaN(priceNum) || priceNum <= 0 || !Number.isInteger(priceNum)) return true
     return false
   }
 
@@ -72,7 +68,6 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
     const payload = {
       service_id: serviceId === UNIVERSAL_VALUE ? null : serviceId,
       name,
-      price: Number(price),
       description: description || undefined,
       includes: includes.filter(i => i.trim().length > 0),
     }
@@ -143,20 +138,6 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price" className="text-sm font-medium">Precio (₡) *</Label>
-            <Input
-              id="price"
-              type="number"
-              min={1}
-              step={1}
-              value={price}
-              onChange={e => setPrice(e.target.value)}
-              placeholder="Ej: 150000"
-            />
-            <p className="text-xs text-white/40">Monto en colones costarricenses, sin decimales</p>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="description" className="text-sm font-medium">Descripción</Label>
             <textarea
               id="description"
@@ -193,7 +174,7 @@ export function PackageSheet({ pkg, isOpen, onOpenChange }: PackageSheetProps) {
           {hasValidationErrors() && (
             <div className="text-sm text-amber-400 flex items-center gap-2">
               <span className="w-2 h-2 bg-amber-400 rounded-full" />
-              Completa el nombre y un precio válido
+              Completa el nombre del paquete
             </div>
           )}
 

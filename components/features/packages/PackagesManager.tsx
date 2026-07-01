@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { usePackages, useDeletePackage, useUpdatePackage } from '@/hooks/usePackages'
 import { useServices } from '@/hooks/useServices'
 import { Package } from '@/services/packages.service'
@@ -28,12 +28,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { PackageSheet } from './PackageSheet'
-
-const currencyFormatter = new Intl.NumberFormat('es-CR', {
-  style: 'currency',
-  currency: 'CRC',
-  maximumFractionDigits: 0,
-})
 
 export default function PackagesManager() {
   const { data: packages = [], isLoading } = usePackages()
@@ -135,7 +129,6 @@ export default function PackagesManager() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Servicio</TableHead>
-                    <TableHead>Precio</TableHead>
                     <TableHead>Destacado</TableHead>
                     <TableHead>Activo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -144,7 +137,7 @@ export default function PackagesManager() {
                 <TableBody>
                   {packages.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center text-white/50">
+                      <TableCell colSpan={5} className="h-32 text-center text-white/50">
                         No hay paquetes. Agrega uno para comenzar.
                       </TableCell>
                     </TableRow>
@@ -157,7 +150,6 @@ export default function PackagesManager() {
                             <Badge variant="outline">Universal</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-white/80">{currencyFormatter.format(pkg.price)}</TableCell>
                         <TableCell>
                           <Button
                             size="sm"

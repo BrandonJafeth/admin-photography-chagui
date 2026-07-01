@@ -146,3 +146,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sileo toasts sobre sheets/dialogs (z-50) */
+[data-sileo-viewport] {
+  z-index: 200;
+}

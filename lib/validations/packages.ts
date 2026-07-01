@@ -8,10 +8,6 @@ export const packageSchema = z.object({
     .min(3, 'El nombre debe tener al menos 3 caracteres')
     .max(200, 'El nombre es demasiado largo'),
 
-  price: z.number()
-    .int('El precio debe ser un número entero')
-    .positive('El precio debe ser mayor a 0'),
-
   description: z.string()
     .max(2000, 'La descripción es demasiado larga')
     .optional(),

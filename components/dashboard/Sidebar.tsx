@@ -17,9 +17,6 @@ import {
   LayoutDashboard,
   Briefcase,
   Package,
-  MessageSquareQuote,
-  Images,
-  UserCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -29,9 +26,6 @@ const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/servicios', label: 'Servicios', icon: Briefcase },
   { href: '/paquetes', label: 'Paquetes', icon: Package },
-  { href: '/testimonios', label: 'Testimonios', icon: MessageSquareQuote },
-  { href: '/hero', label: 'Imágenes Hero', icon: Images },
-  { href: '/about', label: 'Sobre mí', icon: UserCircle },
 ]
 
 export default function Sidebar() {

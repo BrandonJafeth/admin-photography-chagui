@@ -5,7 +5,6 @@ export interface Package {
   id: string
   service_id: string | null
   name: string
-  price: number
   description: string | null
   includes: string[] | null
   is_active: boolean
@@ -18,7 +17,6 @@ export interface Package {
 export interface CreatePackagePayload {
   service_id?: string | null
   name: string
-  price: number
   description?: string
   includes?: string[]
   is_active?: boolean
@@ -29,7 +27,6 @@ export interface CreatePackagePayload {
 export interface UpdatePackagePayload {
   service_id?: string | null
   name?: string
-  price?: number
   description?: string
   includes?: string[]
   is_active?: boolean

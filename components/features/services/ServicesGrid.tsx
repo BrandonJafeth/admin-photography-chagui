@@ -6,7 +6,7 @@ import { useDeleteService, useUpdateService, useUpdateServicesOrder } from '@/ho
 import { Button } from '@/components/ui/button'
 import { Trash2, Eye, EyeOff, GripVertical, Pencil, Loader2 } from 'lucide-react'
 import { ServiceEditSheet } from './ServiceEditSheet'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   AlertDialog,
   AlertDialogAction,

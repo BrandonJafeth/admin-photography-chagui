@@ -12,7 +12,7 @@ export function useLogin() {
       return await signIn(payload)
     },
     onSuccess: async () => {
-      router.push('/dashboard')
+      router.push('/')
     },
   })
 }

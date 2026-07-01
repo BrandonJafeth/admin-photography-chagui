@@ -53,7 +53,7 @@ export async function proxy(request: NextRequest) {
     // Si hay usuario y estamos en login, redirigir al dashboard
     if (user && isLoginPage) {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = '/'
       return NextResponse.redirect(url)
     }
 

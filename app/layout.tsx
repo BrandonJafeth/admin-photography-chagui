@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ReactQueryProvider } from "@/providers/reactQuery";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sileo";
+import "sileo/styles.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,20 @@ export default function RootLayout({
         <ReactQueryProvider>
           {children}
         </ReactQueryProvider>
-        <Toaster richColors position="top-right" />
+        <Toaster
+          position="top-right"
+          theme="dark"
+          options={{
+            fill: '#f8fafb',
+            roundness: 10,
+            styles: {
+              title: 'text-foreground!',
+              description: 'text-muted-foreground!',
+              badge: 'bg-foreground/5!',
+              button: 'bg-foreground/5! hover:bg-foreground/10!',
+            },
+          }}
+        />
       </body>
     </html>
   );
