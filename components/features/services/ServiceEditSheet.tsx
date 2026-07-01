@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Service } from '@/services/services.service'
 import { useUpdateService } from '@/hooks/useServices'
 import { getImageValidationError, uploadToCloudinary } from '@/lib/cloudinary'
@@ -148,10 +149,12 @@ export function ServiceEditSheet({
             <Label className="text-sm font-semibold">Vista Previa</Label>
             <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
               {service.image ? (
-                <img
+                <Image
                   src={service.image}
                   alt={service.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(min-width: 640px) 42rem, 100vw"
+                  className="object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-white/5">

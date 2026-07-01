@@ -54,7 +54,22 @@ export function useUpdatePackage() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdatePackagePayload }) =>
       PackagesService.update(id, payload),
-    onSuccess: () => {
+    onMutate: async ({ id, payload }) => {
+      await queryClient.cancelQueries({ queryKey: ['packages'] })
+      const previousPackages = queryClient.getQueryData<Package[]>(['packages'])
+
+      queryClient.setQueryData<Package[]>(['packages'], (old) =>
+        old?.map((pkg) => (pkg.id === id ? { ...pkg, ...payload } : pkg))
+      )
+
+      return { previousPackages }
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousPackages) {
+        queryClient.setQueryData(['packages'], context.previousPackages)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['packages'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
     },

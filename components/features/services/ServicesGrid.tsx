@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Service } from '@/services/services.service'
 import { useDeleteService, useUpdateService, useUpdateServicesOrder } from '@/hooks/useServices'
 import { Button } from '@/components/ui/button'
@@ -169,10 +170,12 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
           <div className="rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl">
             <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
               {draggedService.image ? (
-                <img
+                <Image
                   src={draggedService.image}
                   alt={draggedService.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="300px"
+                  className="object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-white/5">
@@ -206,10 +209,13 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
             {/* Imagen */}
             <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
               {service.image ? (
-                <img
+                <Image
                   src={service.image}
                   alt={service.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  className="object-cover"
+                  priority={index < 3}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-white/5">

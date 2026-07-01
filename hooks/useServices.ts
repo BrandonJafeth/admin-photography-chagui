@@ -54,7 +54,22 @@ export function useUpdateService() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateServicePayload }) =>
       ServicesService.update(id, payload),
-    onSuccess: () => {
+    onMutate: async ({ id, payload }) => {
+      await queryClient.cancelQueries({ queryKey: ['services'] })
+      const previousServices = queryClient.getQueryData<Service[]>(['services'])
+
+      queryClient.setQueryData<Service[]>(['services'], (old) =>
+        old?.map((svc) => (svc.id === id ? { ...svc, ...payload } : svc))
+      )
+
+      return { previousServices }
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousServices) {
+        queryClient.setQueryData(['services'], context.previousServices)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] })
     },
   })
@@ -83,7 +98,25 @@ export function useUpdateServicesOrder() {
   return useMutation({
     mutationFn: (updates: Array<{ id: string; order: number }>) =>
       ServicesService.updateOrder(updates),
-    onSuccess: () => {
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ['services'] })
+      const previousServices = queryClient.getQueryData<Service[]>(['services'])
+      const orderById = new Map(updates.map((u) => [u.id, u.order]))
+
+      queryClient.setQueryData<Service[]>(['services'], (old) =>
+        old
+          ?.map((svc) => ({ ...svc, order: orderById.get(svc.id) ?? svc.order }))
+          .sort((a, b) => a.order - b.order)
+      )
+
+      return { previousServices }
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousServices) {
+        queryClient.setQueryData(['services'], context.previousServices)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] })
     },
   })

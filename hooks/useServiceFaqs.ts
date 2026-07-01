@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ServiceFaqsService,
+  type ServiceFaq,
   type CreateServiceFaqPayload,
   type UpdateServiceFaqPayload,
 } from '@/services/service-faqs.service'
@@ -42,7 +43,22 @@ export function useUpdateServiceFaq(serviceId: string) {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateServiceFaqPayload }) =>
       ServiceFaqsService.update(id, payload),
-    onSuccess: () => {
+    onMutate: async ({ id, payload }) => {
+      await queryClient.cancelQueries({ queryKey: ['service-faqs', serviceId] })
+      const previousFaqs = queryClient.getQueryData<ServiceFaq[]>(['service-faqs', serviceId])
+
+      queryClient.setQueryData<ServiceFaq[]>(['service-faqs', serviceId], (old) =>
+        old?.map((faq) => (faq.id === id ? { ...faq, ...payload } : faq))
+      )
+
+      return { previousFaqs }
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousFaqs) {
+        queryClient.setQueryData(['service-faqs', serviceId], context.previousFaqs)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['service-faqs', serviceId] })
     },
   })
@@ -71,7 +87,25 @@ export function useUpdateServiceFaqsOrder(serviceId: string) {
   return useMutation({
     mutationFn: (updates: Array<{ id: string; order: number }>) =>
       ServiceFaqsService.updateOrder(updates),
-    onSuccess: () => {
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ['service-faqs', serviceId] })
+      const previousFaqs = queryClient.getQueryData<ServiceFaq[]>(['service-faqs', serviceId])
+      const orderById = new Map(updates.map((u) => [u.id, u.order]))
+
+      queryClient.setQueryData<ServiceFaq[]>(['service-faqs', serviceId], (old) =>
+        old
+          ?.map((faq) => ({ ...faq, order: orderById.get(faq.id) ?? faq.order }))
+          .sort((a, b) => a.order - b.order)
+      )
+
+      return { previousFaqs }
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousFaqs) {
+        queryClient.setQueryData(['service-faqs', serviceId], context.previousFaqs)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['service-faqs', serviceId] })
     },
   })
