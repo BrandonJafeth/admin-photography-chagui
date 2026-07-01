@@ -29,7 +29,7 @@ import {
 import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { PackageSheet } from './PackageSheet'
 
-type SheetState = { isOpen: boolean; editingPackage: Package | null }
+type SheetState = { isOpen: boolean; editingPackage: Package | null; newPackageNonce: number }
 type SheetAction =
   | { type: 'createRequested' }
   | { type: 'editRequested'; pkg: Package }
@@ -38,9 +38,9 @@ type SheetAction =
 function sheetReducer(state: SheetState, action: SheetAction): SheetState {
   switch (action.type) {
     case 'createRequested':
-      return { isOpen: true, editingPackage: null }
+      return { isOpen: true, editingPackage: null, newPackageNonce: state.newPackageNonce + 1 }
     case 'editRequested':
-      return { isOpen: true, editingPackage: action.pkg }
+      return { ...state, isOpen: true, editingPackage: action.pkg }
     case 'openChanged':
       return { ...state, isOpen: action.open }
   }
@@ -69,12 +69,16 @@ export default function PackagesManager() {
   const deletePackage = useDeletePackage()
   const updatePackage = useUpdatePackage()
 
-  const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingPackage: null })
+  const [sheetState, dispatchSheet] = useReducer(sheetReducer, {
+    isOpen: false,
+    editingPackage: null,
+    newPackageNonce: 0,
+  })
   const [deleteDialogState, dispatchDeleteDialog] = useReducer(deleteDialogReducer, {
     isOpen: false,
     packageToDelete: null,
   })
-  const { isOpen: isSheetOpen, editingPackage } = sheetState
+  const { isOpen: isSheetOpen, editingPackage, newPackageNonce } = sheetState
   const { isOpen: deleteDialogOpen, packageToDelete } = deleteDialogState
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
@@ -268,7 +272,7 @@ export default function PackagesManager() {
       </div>
 
       <PackageSheet
-        key={editingPackage?.id ?? 'new'}
+        key={editingPackage?.id ?? `new-${newPackageNonce}`}
         pkg={editingPackage}
         isOpen={isSheetOpen}
         onOpenChange={open => dispatchSheet({ type: 'openChanged', open })}

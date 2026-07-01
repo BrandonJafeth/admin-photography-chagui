@@ -38,7 +38,7 @@ interface ServiceFaqsManagerProps {
   serviceId: string
 }
 
-type SheetState = { isOpen: boolean; editingFaq: ServiceFaq | null }
+type SheetState = { isOpen: boolean; editingFaq: ServiceFaq | null; newFaqNonce: number }
 type SheetAction =
   | { type: 'opened'; faq: ServiceFaq | null }
   | { type: 'openChanged'; open: boolean }
@@ -46,7 +46,11 @@ type SheetAction =
 function sheetReducer(state: SheetState, action: SheetAction): SheetState {
   switch (action.type) {
     case 'opened':
-      return { isOpen: true, editingFaq: action.faq }
+      return {
+        isOpen: true,
+        editingFaq: action.faq,
+        newFaqNonce: action.faq ? state.newFaqNonce : state.newFaqNonce + 1,
+      }
     case 'openChanged':
       return { ...state, isOpen: action.open, editingFaq: action.open ? state.editingFaq : null }
   }
@@ -293,7 +297,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
   const updateFaq = useUpdateServiceFaq(serviceId)
   const updateOrder = useUpdateServiceFaqsOrder(serviceId)
 
-  const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingFaq: null })
+  const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingFaq: null, newFaqNonce: 0 })
   const [deleteState, dispatchDelete] = useReducer(deleteDialogReducer, { isOpen: false, faqToDelete: null })
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
@@ -428,7 +432,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
       </div>
 
       <FaqSheet
-        key={sheetState.editingFaq?.id ?? 'new'}
+        key={sheetState.editingFaq?.id ?? `new-${sheetState.newFaqNonce}`}
         serviceId={serviceId}
         faq={sheetState.editingFaq}
         isOpen={sheetState.isOpen}
