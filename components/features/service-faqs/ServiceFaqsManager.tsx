@@ -265,13 +265,14 @@ function FaqTable({ faqs, togglingId, onMove, onToggleActive, onEdit, onDelete }
 interface DeleteFaqDialogProps {
   isOpen: boolean
   question: string | undefined
+  isDeleting: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }
 
-function DeleteFaqDialog({ isOpen, question, onOpenChange, onConfirm }: DeleteFaqDialogProps) {
+function DeleteFaqDialog({ isOpen, question, isDeleting, onOpenChange, onConfirm }: DeleteFaqDialogProps) {
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+    <AlertDialog open={isOpen} onOpenChange={open => !isDeleting && onOpenChange(open)}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar pregunta?</AlertDialogTitle>
@@ -280,9 +281,23 @@ function DeleteFaqDialog({ isOpen, question, onOpenChange, onConfirm }: DeleteFa
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700 text-white">
-            Eliminar
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={e => {
+              e.preventDefault()
+              onConfirm()
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white gap-2"
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Eliminando...
+              </>
+            ) : (
+              'Eliminar'
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -442,6 +457,7 @@ export default function ServiceFaqsManager({ serviceId }: ServiceFaqsManagerProp
       <DeleteFaqDialog
         isOpen={deleteState.isOpen}
         question={deleteState.faqToDelete?.question}
+        isDeleting={deleteFaq.isPending}
         onOpenChange={(open) => dispatchDelete({ type: 'openChanged', open })}
         onConfirm={confirmDelete}
       />

@@ -262,13 +262,14 @@ function SortableServiceCard(props: ServiceCardProps) {
 interface DeleteServiceDialogProps {
   open: boolean
   serviceTitle: string | undefined
+  isDeleting: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }
 
-function DeleteServiceDialog({ open, serviceTitle, onOpenChange, onConfirm }: DeleteServiceDialogProps) {
+function DeleteServiceDialog({ open, serviceTitle, isDeleting, onOpenChange, onConfirm }: DeleteServiceDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={open => !isDeleting && onOpenChange(open)}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
@@ -277,12 +278,23 @@ function DeleteServiceDialog({ open, serviceTitle, onOpenChange, onConfirm }: De
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={e => {
+              e.preventDefault()
+              onConfirm()
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white gap-2"
           >
-            Eliminar
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Eliminando...
+              </>
+            ) : (
+              'Eliminar'
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -471,6 +483,7 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
       <DeleteServiceDialog
         open={deleteDialogOpen}
         serviceTitle={serviceToDelete?.title}
+        isDeleting={deleteService.isPending}
         onOpenChange={(open) => dispatchDeleteDialog({ type: 'openChanged', open })}
         onConfirm={confirmDelete}
       />

@@ -290,7 +290,7 @@ export default function PackagesManager() {
 
       <AlertDialog
         open={deleteDialogOpen}
-        onOpenChange={open => dispatchDeleteDialog({ type: 'openChanged', open })}
+        onOpenChange={open => !deletePackage.isPending && dispatchDeleteDialog({ type: 'openChanged', open })}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -300,9 +300,23 @@ export default function PackagesManager() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Eliminar
+            <AlertDialogCancel disabled={deletePackage.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                e.preventDefault()
+                confirmDelete()
+              }}
+              disabled={deletePackage.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white gap-2"
+            >
+              {deletePackage.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                'Eliminar'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

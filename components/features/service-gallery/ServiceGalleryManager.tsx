@@ -42,7 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, GripVertical, Images, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, GripVertical, Images, Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { GalleryImageSheet } from './GalleryImageSheet'
 
 interface ServiceGalleryManagerProps {
@@ -241,13 +241,14 @@ function GalleryGrid({ images, pageOffset, onDragEnd, onEdit, onDelete }: Galler
 interface DeleteGalleryImageDialogProps {
   isOpen: boolean
   image: ServiceGalleryImage | null
+  isDeleting: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }
 
-function DeleteGalleryImageDialog({ isOpen, image, onOpenChange, onConfirm }: DeleteGalleryImageDialogProps) {
+function DeleteGalleryImageDialog({ isOpen, image, isDeleting, onOpenChange, onConfirm }: DeleteGalleryImageDialogProps) {
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+    <AlertDialog open={isOpen} onOpenChange={open => !isDeleting && onOpenChange(open)}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar imagen?</AlertDialogTitle>
@@ -256,9 +257,23 @@ function DeleteGalleryImageDialog({ isOpen, image, onOpenChange, onConfirm }: De
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700 text-white">
-            Eliminar
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={e => {
+              e.preventDefault()
+              onConfirm()
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white gap-2"
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Eliminando...
+              </>
+            ) : (
+              'Eliminar'
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -440,6 +455,7 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
       <DeleteGalleryImageDialog
         isOpen={deleteState.isOpen}
         image={deleteState.imageToDelete}
+        isDeleting={deleteImage.isPending}
         onOpenChange={(open) => dispatchDelete({ type: 'openChanged', open })}
         onConfirm={confirmDelete}
       />
