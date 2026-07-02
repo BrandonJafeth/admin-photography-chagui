@@ -7,6 +7,7 @@ import type { SignInPayload } from '@/services/auth.service'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 
 type FormState = { email: string; password: string; rememberMe: boolean }
@@ -144,14 +145,16 @@ export default function LoginPage() {
 
               {/* Recordarme */}
               <div className="flex items-center pt-1">
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <input
-                    type="checkbox"
+                <label
+                  htmlFor="rememberMe"
+                  className="flex items-center gap-2.5 -m-2 p-2 cursor-pointer touch-manipulation select-none group"
+                >
+                  <Checkbox
+                    id="rememberMe"
                     checked={form.rememberMe}
-                    onChange={(e) => dispatchForm({ type: 'fieldChanged', name: 'rememberMe', value: e.target.checked })}
-                    className="w-[18px] h-[18px] rounded-md border border-white/15 bg-[#0d0d0d] accent-white cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-white/10"
+                    onCheckedChange={(checked) => dispatchForm({ type: 'fieldChanged', name: 'rememberMe', value: checked === true })}
                   />
-                  <span className="text-sm text-[#999999] group-hover:text-white/90 transition-colors select-none">
+                  <span className="text-sm text-[#999999] group-hover:text-white/90 transition-colors">
                     Recordarme en este dispositivo
                   </span>
                 </label>

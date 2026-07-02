@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StringListField } from '@/components/ui/StringListField'
+import { ParagraphEditor } from '@/components/ui/paragraph-editor'
 import { DisplayModeToggle } from './DisplayModeToggle'
 import {
   Sheet,
@@ -224,13 +225,12 @@ function ServiceFormFields({ form, onFieldChange }: ServiceFormFieldsProps) {
         <Label htmlFor="detailedDescription" className="text-sm font-medium">
           Descripción Detallada (opcional)
         </Label>
-        <textarea
+        <ParagraphEditor
           id="detailedDescription"
-          aria-label="Descripción Detallada"
           value={form.detailedDescription}
-          onChange={e => onFieldChange('detailedDescription', e.target.value)}
-          className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
-          placeholder="Información ampliada que se muestra en la página del servicio..."
+          onChange={value => onFieldChange('detailedDescription', value)}
+          placeholder="Información ampliada que se muestra en la página del servicio. Usa 'Nuevo párrafo' para separar ideas en bloques legibles..."
+          maxLength={5000}
         />
       </div>
     </>
