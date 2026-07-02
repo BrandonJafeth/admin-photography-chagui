@@ -1,57 +1,21 @@
 // lib/validations/services.ts
 import { z } from 'zod'
 
-// Regex para slug: solo letras minúsculas, números y guiones
-const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-
-const serviceSchema = z.object({
+export const serviceFormSchema = z.object({
   title: z.string()
     .min(3, 'El título debe tener al menos 3 caracteres')
-    .max(200, 'El título es demasiado largo'),
-
-  slug: z.string()
-    .min(3, 'El slug debe tener al menos 3 caracteres')
-    .max(200, 'El slug es demasiado largo')
-    .regex(slugRegex, 'Solo letras minúsculas, números y guiones. Ej: fotografia-bodas')
-    .refine((val) => !val.startsWith('-') && !val.endsWith('-'), {
-      message: 'El slug no puede empezar ni terminar con guión',
-    }),
+    .max(200, 'El título es demasiado largo (máximo 200 caracteres)'),
 
   description: z.string()
     .min(20, 'La descripción debe tener al menos 20 caracteres')
-    .max(2000, 'La descripción es demasiado larga'),
+    .max(2000, 'La descripción es demasiado larga (máximo 2000 caracteres)'),
 
-  detailed_description: z.string()
-    .max(5000, 'La descripción detallada es demasiado larga')
+  detailedDescription: z.string()
+    .max(5000, 'La descripción detallada es demasiado larga (máximo 5000 caracteres)')
     .optional(),
-
-  image: z.string()
-    .url('Debe ser una URL válida')
-    .optional()
-    .or(z.literal('')),
-
-  features: z.array(z.string().min(1, 'El ítem no puede estar vacío')).default([]),
-
-  is_active: z.boolean().default(true),
-
-  order: z.number().int().min(0).default(0),
-
-  use_carousel: z.boolean().default(false),
 })
 
-export type ServiceFormData = z.infer<typeof serviceSchema>
-
-// Schema para crear servicio
-const createServiceSchema = serviceSchema.omit({
-  detailed_description: true,
-})
-
-export type CreateServiceFormData = z.infer<typeof createServiceSchema>
-
-// Schema para actualizar servicio (todos los campos opcionales excepto validaciones)
-const updateServiceSchema = serviceSchema.partial()
-
-export type UpdateServiceFormData = z.infer<typeof updateServiceSchema>
+export type ServiceFormValues = z.infer<typeof serviceFormSchema>
 
 /**
  * Genera un slug a partir de un texto (título)
@@ -66,4 +30,13 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+/** Genera un slug único agregando -2, -3... si ya existe entre los slugs dados */
+export function uniqueSlug(base: string, existingSlugs: Set<string>): string {
+  const seed = base || 'servicio'
+  if (!existingSlugs.has(seed)) return seed
+  let i = 2
+  while (existingSlugs.has(`${seed}-${i}`)) i++
+  return `${seed}-${i}`
 }

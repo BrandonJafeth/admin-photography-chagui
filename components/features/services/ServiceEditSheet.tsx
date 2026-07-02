@@ -3,9 +3,12 @@
 import { useReducer, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useForm, useWatch, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Service } from '@/services/services.service'
 import { useUpdateService } from '@/hooks/useServices'
 import { useServiceGallery } from '@/hooks/useServiceGallery'
+import { serviceFormSchema, type ServiceFormValues } from '@/lib/validations/services'
 import { getImageValidationError, uploadToCloudinary } from '@/lib/cloudinary'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,25 +43,6 @@ interface ServiceEditSheetProps {
   onClose: () => void
 }
 
-type FormState = {
-  title: string
-  description: string
-  detailedDescription: string
-}
-
-type FormAction = {
-  type: 'fieldChanged'
-  name: keyof FormState
-  value: string
-}
-
-function formReducer(state: FormState, action: FormAction): FormState {
-  switch (action.type) {
-    case 'fieldChanged':
-      return { ...state, [action.name]: action.value }
-  }
-}
-
 type UploadState = {
   isUploading: boolean
   uploadError: string | null
@@ -78,17 +62,6 @@ function uploadReducer(state: UploadState, action: UploadAction): UploadState {
     case 'uploadFinished':
       return { ...state, isUploading: false }
   }
-}
-
-function getValidationErrors(form: FormState): string[] {
-  const errors: string[] = []
-  if (!form.title || form.title.length < 3 || form.title.length > 200) {
-    errors.push('El título debe tener entre 3 y 200 caracteres')
-  }
-  if (!form.description || form.description.length < 20 || form.description.length > 2000) {
-    errors.push('La descripción debe tener entre 20 y 2000 caracteres')
-  }
-  return errors
 }
 
 interface ImagePreviewUploadProps {
@@ -170,70 +143,6 @@ function ImagePreviewUpload({
   )
 }
 
-interface ServiceFormFieldsProps {
-  form: FormState
-  onFieldChange: (name: keyof FormState, value: string) => void
-  touched: Record<string, boolean>
-  submitAttempted: boolean
-  onBlurField: (name: string) => void
-}
-
-function ServiceFormFields({ form, onFieldChange, touched, submitAttempted, onBlurField }: ServiceFormFieldsProps) {
-  const showTitleError = touched.title || submitAttempted
-  const showDescriptionError = touched.description || submitAttempted
-
-  return (
-    <>
-      <div className="space-y-2 border-t border-white/10 pt-6">
-        <Label htmlFor="title" className="text-sm font-medium">
-          Título <span className="text-red-400">*</span>
-        </Label>
-        <Input
-          id="title"
-          value={form.title}
-          onChange={e => onFieldChange('title', e.target.value)}
-          onBlur={() => onBlurField('title')}
-          placeholder="Ej: BODAS"
-        />
-        {showTitleError && form.title && form.title.length < 3 && (
-          <p className="text-xs text-amber-400">El título debe tener al menos 3 caracteres</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description" className="text-sm font-medium">
-          Descripción <span className="text-red-400">*</span> ({form.description.length}/2000)
-        </Label>
-        <textarea
-          id="description"
-          aria-label="Descripción"
-          value={form.description}
-          onChange={e => onFieldChange('description', e.target.value)}
-          onBlur={() => onBlurField('description')}
-          className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
-          placeholder="Describe el servicio de manera clara y concisa..."
-        />
-        {showDescriptionError && form.description && form.description.length < 20 && (
-          <p className="text-xs text-amber-400">La descripción debe tener al menos 20 caracteres</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="detailedDescription" className="text-sm font-medium">
-          Descripción Detallada (opcional)
-        </Label>
-        <ParagraphEditor
-          id="detailedDescription"
-          value={form.detailedDescription}
-          onChange={value => onFieldChange('detailedDescription', value)}
-          placeholder="Información ampliada que se muestra en la página del servicio. Usa 'Nuevo párrafo' para separar ideas en bloques legibles..."
-          maxLength={5000}
-        />
-      </div>
-    </>
-  )
-}
-
 interface ServiceMetadataProps {
   service: Service
 }
@@ -254,11 +163,12 @@ export function ServiceEditSheet({
   onOpenChange,
   onClose,
 }: ServiceEditSheetProps) {
-  const [form, dispatchForm] = useReducer(formReducer, {
+  const defaultValues: ServiceFormValues = {
     title: service.title,
     description: service.description,
     detailedDescription: service.detailed_description || '',
-  })
+  }
+
   const [features, setFeatures] = useState<string[]>(service.features || [])
   const [useCarousel, setUseCarousel] = useState(service.use_carousel)
   const { data: galleryImages } = useServiceGallery(service.id)
@@ -267,25 +177,28 @@ export function ServiceEditSheet({
     isUploading: false,
     uploadError: null,
   })
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const [submitAttempted, setSubmitAttempted] = useState(false)
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const updateService = useUpdateService()
 
-  const handleFieldChange = (name: keyof FormState, value: string) => {
-    dispatchForm({ type: 'fieldChanged', name, value })
-  }
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset: resetForm,
+    formState: { errors, isSubmitting, isDirty: isFormDirty, isSubmitted },
+  } = useForm<ServiceFormValues>({
+    resolver: zodResolver(serviceFormSchema),
+    defaultValues,
+    mode: 'onBlur',
+  })
 
-  const handleBlurField = (name: string) => {
-    setTouched(prev => ({ ...prev, [name]: true }))
-  }
+  const descriptionValue = useWatch({ control, name: 'description' })
+  const isPending = updateService.isPending || isSubmitting
 
   const isDirty = () =>
-    form.title !== service.title ||
-    form.description !== service.description ||
-    form.detailedDescription !== (service.detailed_description || '') ||
+    isFormDirty ||
     JSON.stringify(features) !== JSON.stringify(service.features || []) ||
     useCarousel !== service.use_carousel
 
@@ -323,20 +236,14 @@ export function ServiceEditSheet({
     }
   }
 
-  const handleSave = async () => {
-    const errors = getValidationErrors(form)
-    if (errors.length > 0) {
-      setSubmitAttempted(true)
-      return
-    }
-
+  const onSubmit = async (values: ServiceFormValues) => {
     try {
       await updateService.mutateAsync({
         id: service.id,
         payload: {
-          title: form.title,
-          description: form.description,
-          detailed_description: form.detailedDescription || undefined,
+          title: values.title,
+          description: values.description,
+          detailed_description: values.detailedDescription || undefined,
           features: features.filter(f => f.trim().length > 0),
           use_carousel: useCarousel,
         },
@@ -354,17 +261,9 @@ export function ServiceEditSheet({
   }
 
   const revertChanges = () => {
-    dispatchForm({ type: 'fieldChanged', name: 'title', value: service.title })
-    dispatchForm({ type: 'fieldChanged', name: 'description', value: service.description })
-    dispatchForm({
-      type: 'fieldChanged',
-      name: 'detailedDescription',
-      value: service.detailed_description || '',
-    })
+    resetForm(defaultValues)
     setFeatures(service.features || [])
     setUseCarousel(service.use_carousel)
-    setTouched({})
-    setSubmitAttempted(false)
   }
 
   const handleCancel = () => {
@@ -389,136 +288,180 @@ export function ServiceEditSheet({
     onOpenChange(open)
   }
 
-  const validationErrors = getValidationErrors(form)
+  const errorList = Object.values(errors)
+    .map(e => e?.message)
+    .filter((msg): msg is string => !!msg)
+
+  const onFormSubmit = handleSubmit(onSubmit)
 
   return (
     <>
-    <Sheet open={isOpen} onOpenChange={handleSheetOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-[#1a1a1a] border-b border-white/10">
-          <SheetHeader className="px-6 py-4">
-            <SheetTitle className="text-xl">Editar Servicio</SheetTitle>
-            <SheetDescription>
-              Actualiza los detalles del servicio · <span className="text-white/30">* campos requeridos</span>
-            </SheetDescription>
-          </SheetHeader>
-        </div>
+      <Sheet open={isOpen} onOpenChange={handleSheetOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
+          <div className="sticky top-0 z-10 bg-[#1a1a1a] border-b border-white/10">
+            <SheetHeader className="px-6 py-4">
+              <SheetTitle className="text-xl">Editar Servicio</SheetTitle>
+              <SheetDescription>
+                Actualiza los detalles del servicio · <span className="text-white/30">* campos requeridos</span>
+              </SheetDescription>
+            </SheetHeader>
+          </div>
 
-        <div className="px-6 py-6 space-y-8">
-          <ImagePreviewUpload
-            service={service}
-            isUploading={upload.isUploading}
-            uploadError={upload.uploadError}
-            onFileSelected={handleImageUpload}
-          />
-
-          <ServiceFormFields
-            form={form}
-            onFieldChange={handleFieldChange}
-            touched={touched}
-            submitAttempted={submitAttempted}
-            onBlurField={handleBlurField}
-          />
-
-          {/* Features */}
-          <div className="border-t border-white/10 pt-6">
-            <StringListField
-              label="Características"
-              items={features}
-              onChange={setFeatures}
-              placeholder="Ej: 8 horas de cobertura"
-              disabled={updateService.isPending}
+          <form onSubmit={onFormSubmit} className="px-6 py-6 space-y-8">
+            <ImagePreviewUpload
+              service={service}
+              isUploading={upload.isUploading}
+              uploadError={upload.uploadError}
+              onFileSelected={handleImageUpload}
             />
-          </div>
 
-          {/* FAQs */}
-          <div className="border-t border-white/10 pt-6">
-            <Link href={`/servicios/${service.id}/faqs`} onClick={onClose}>
-              <Button type="button" variant="outline" className="w-full gap-2">
-                <MessageCircleQuestion className="w-4 h-4" />
-                Gestionar Preguntas Frecuentes
-              </Button>
-            </Link>
-          </div>
-
-          {/* Galería */}
-          <div className="border-t border-white/10 pt-6">
-            <Link href={`/servicios/${service.id}/galeria`} onClick={onClose}>
-              <Button type="button" variant="outline" className="w-full gap-2">
-                <Images className="w-4 h-4" />
-                Gestionar Galería
-              </Button>
-            </Link>
-          </div>
-
-          <DisplayModeToggle
-            useCarousel={useCarousel}
-            onChange={setUseCarousel}
-            disabled={updateService.isPending}
-            carouselEligible={canUseCarousel}
-          />
-
-          <ServiceMetadata service={service} />
-
-          {submitAttempted && validationErrors.length > 0 && (
-            <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-3 -mt-4">
-              <p className="mb-1.5 text-sm font-medium text-amber-400">Antes de guardar, corrige:</p>
-              <ul className="space-y-1">
-                {validationErrors.map(err => (
-                  <li key={err} className="flex items-start gap-1.5 text-xs text-amber-400/90">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                    {err}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10 -mx-6 px-6 py-4 flex gap-3">
-            <Button
-              type="submit"
-              onClick={handleSave}
-              disabled={updateService.isPending}
-              className="flex-1 h-11"
-            >
-              {updateService.isPending ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Guardando...
-                </span>
-              ) : (
-                'Guardar Cambios'
+            <div className="space-y-2 border-t border-white/10 pt-6">
+              <Label htmlFor="title" className="text-sm font-medium">
+                Título <span className="text-red-400">*</span>
+              </Label>
+              <Input id="title" placeholder="Ej: BODAS" {...register('title')} />
+              {errors.title && (
+                <p className="text-xs text-amber-400">{errors.title.message}</p>
               )}
-            </Button>
+            </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancel}
-              className="h-11"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-sm font-medium">
+                Descripción <span className="text-red-400">*</span> ({descriptionValue?.length ?? 0}/2000)
+              </Label>
+              <textarea
+                id="description"
+                aria-label="Descripción"
+                className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
+                placeholder="Describe el servicio de manera clara y concisa..."
+                {...register('description')}
+              />
+              {errors.description && (
+                <p className="text-xs text-amber-400">{errors.description.message}</p>
+              )}
+            </div>
 
-    <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Se perderán los cambios que hiciste en este formulario.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Seguir editando</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmDiscard}>Descartar</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            <div className="space-y-2">
+              <Label htmlFor="detailedDescription" className="text-sm font-medium">
+                Descripción Detallada (opcional)
+              </Label>
+              <Controller
+                name="detailedDescription"
+                control={control}
+                render={({ field }) => (
+                  <ParagraphEditor
+                    id="detailedDescription"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    placeholder="Información ampliada que se muestra en la página del servicio. Usa 'Nuevo párrafo' para separar ideas en bloques legibles..."
+                    maxLength={5000}
+                  />
+                )}
+              />
+              {errors.detailedDescription && (
+                <p className="text-xs text-amber-400">{errors.detailedDescription.message}</p>
+              )}
+            </div>
+
+            {/* Features */}
+            <div className="border-t border-white/10 pt-6">
+              <StringListField
+                label="Características"
+                items={features}
+                onChange={setFeatures}
+                placeholder="Ej: 8 horas de cobertura"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* FAQs */}
+            <div className="border-t border-white/10 pt-6">
+              <Link href={`/servicios/${service.id}/faqs`} onClick={onClose}>
+                <Button type="button" variant="outline" className="w-full gap-2">
+                  <MessageCircleQuestion className="w-4 h-4" />
+                  Gestionar Preguntas Frecuentes
+                </Button>
+              </Link>
+            </div>
+
+            {/* Galería */}
+            <div className="border-t border-white/10 pt-6">
+              <Link href={`/servicios/${service.id}/galeria`} onClick={onClose}>
+                <Button type="button" variant="outline" className="w-full gap-2">
+                  <Images className="w-4 h-4" />
+                  Gestionar Galería
+                </Button>
+              </Link>
+            </div>
+
+            <DisplayModeToggle
+              useCarousel={useCarousel}
+              onChange={setUseCarousel}
+              disabled={isPending}
+              carouselEligible={canUseCarousel}
+            />
+
+            <ServiceMetadata service={service} />
+
+            {isSubmitted && errorList.length > 0 && (
+              <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-3 -mt-4">
+                <p className="mb-1.5 text-sm font-medium text-amber-400">Antes de guardar, corrige:</p>
+                <ul className="space-y-1">
+                  {errorList.map(err => (
+                    <li key={err} className="flex items-start gap-1.5 text-xs text-amber-400/90">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                      {err}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10 -mx-6 px-6 py-4 flex gap-3">
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="flex-1 h-11"
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Guardando...
+                  </span>
+                ) : (
+                  'Guardar Cambios'
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                className="h-11"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se perderán los cambios que hiciste en este formulario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDiscard}>Descartar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
