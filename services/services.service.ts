@@ -12,6 +12,7 @@ export interface Service {
   features: string[] | null
   is_active: boolean
   order: number
+  use_carousel: boolean
   created_at: string
   updated_at: string
 }
@@ -25,6 +26,7 @@ export interface CreateServicePayload {
   features?: string[]
   is_active?: boolean
   order?: number
+  use_carousel?: boolean
 }
 
 export interface UpdateServicePayload {
@@ -36,6 +38,7 @@ export interface UpdateServicePayload {
   features?: string[]
   is_active?: boolean
   order?: number
+  use_carousel?: boolean
 }
 
 /**

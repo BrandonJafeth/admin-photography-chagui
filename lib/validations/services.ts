@@ -35,6 +35,8 @@ const serviceSchema = z.object({
   is_active: z.boolean().default(true),
 
   order: z.number().int().min(0).default(0),
+
+  use_carousel: z.boolean().default(false),
 })
 
 export type ServiceFormData = z.infer<typeof serviceSchema>

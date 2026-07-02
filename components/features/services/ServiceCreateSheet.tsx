@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StringListField } from '@/components/ui/StringListField'
+import { DisplayModeToggle } from './DisplayModeToggle'
 import {
   Sheet,
   SheetContent,
@@ -284,6 +285,7 @@ export function ServiceCreateSheet({
   const [image, dispatchImage] = useReducer(imageReducer, initialImageState)
   const slugTouchedRef = useRef(false)
   const [features, setFeatures] = useState<string[]>([])
+  const [useCarousel, setUseCarousel] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFieldChange = (name: keyof FormState, value: string) => {
@@ -319,6 +321,7 @@ export function ServiceCreateSheet({
     dispatchForm({ type: 'reset' })
     slugTouchedRef.current = false
     setFeatures([])
+    setUseCarousel(false)
     dispatchImage({ type: 'reset' })
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -361,6 +364,7 @@ export function ServiceCreateSheet({
         image: uploadedImageUrl,
         order: nextOrder,
         is_active: true,
+        use_carousel: useCarousel,
       })
 
       toast.dismiss(loadingToast)
@@ -437,6 +441,12 @@ export function ServiceCreateSheet({
               disabled={createService.isPending}
             />
           </div>
+
+          <DisplayModeToggle
+            useCarousel={useCarousel}
+            onChange={setUseCarousel}
+            disabled={createService.isPending}
+          />
 
           {hasValidationErrors(form, image) && (
             <div className="text-sm text-amber-400 flex items-center gap-2 -mt-4">

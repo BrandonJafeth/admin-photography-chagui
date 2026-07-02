@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StringListField } from '@/components/ui/StringListField'
+import { DisplayModeToggle } from './DisplayModeToggle'
 import {
   Sheet,
   SheetContent,
@@ -263,6 +264,7 @@ export function ServiceEditSheet({
     detailedDescription: service.detailed_description || '',
   })
   const [features, setFeatures] = useState<string[]>(service.features || [])
+  const [useCarousel, setUseCarousel] = useState(service.use_carousel)
   const [upload, dispatchUpload] = useReducer(uploadReducer, {
     isUploading: false,
     uploadError: null,
@@ -345,6 +347,7 @@ export function ServiceEditSheet({
           description: form.description,
           detailed_description: form.detailedDescription || undefined,
           features: features.filter(f => f.trim().length > 0),
+          use_carousel: useCarousel,
         },
       })
       toast.success('¡Servicio actualizado!', {
@@ -369,6 +372,7 @@ export function ServiceEditSheet({
       value: service.detailed_description || '',
     })
     setFeatures(service.features || [])
+    setUseCarousel(service.use_carousel)
     onClose()
   }
 
@@ -424,6 +428,12 @@ export function ServiceEditSheet({
               </Button>
             </Link>
           </div>
+
+          <DisplayModeToggle
+            useCarousel={useCarousel}
+            onChange={setUseCarousel}
+            disabled={updateService.isPending}
+          />
 
           <ServiceMetadata service={service} />
 
