@@ -1,15 +1,17 @@
 'use client'
 
-import { useReducer } from 'react'
+import { useReducer, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -38,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, GripVertical, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, GripVertical, Images, Plus, Pencil, Trash2 } from 'lucide-react'
 import { GalleryImageSheet } from './GalleryImageSheet'
 
 interface ServiceGalleryManagerProps {
@@ -80,13 +82,84 @@ function deleteDialogReducer(state: DeleteDialogState, action: DeleteDialogActio
   }
 }
 
-interface SortableGalleryItemProps {
+interface GalleryThumbnailProps {
   image: ServiceGalleryImage
+  index: number
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
   onEdit: (image: ServiceGalleryImage) => void
   onDelete: (image: ServiceGalleryImage) => void
 }
 
-function SortableGalleryItem({ image, onEdit, onDelete }: SortableGalleryItemProps) {
+function GalleryThumbnail({ image, index, dragHandleProps, onEdit, onDelete }: GalleryThumbnailProps) {
+  return (
+    <>
+      <span className="absolute top-2 left-2 z-10 font-mono text-[10px] tracking-widest text-white/50 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
+        {String(index + 1).padStart(2, '0')}
+      </span>
+
+      <Image
+        src={image.image_url}
+        alt={image.caption || 'Imagen de galería'}
+        fill
+        unoptimized
+        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+        className="object-cover"
+      />
+
+      <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/70 to-transparent pointer-events-none" />
+
+      {dragHandleProps && (
+        <button
+          type="button"
+          {...dragHandleProps}
+          className="absolute top-1.5 right-1.5 flex items-center justify-center h-7 w-7 rounded-md bg-black/50 backdrop-blur-sm text-white/70 hover:text-white cursor-grab active:cursor-grabbing touch-none"
+          title="Arrastrar para reordenar"
+          aria-label="Arrastrar para reordenar"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
+
+      <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 bg-black/50 backdrop-blur-sm hover:bg-black/70"
+          onClick={() => onEdit(image)}
+          title="Editar título"
+          aria-label="Editar título"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 bg-black/50 backdrop-blur-sm hover:bg-black/70 text-red-400 hover:text-red-300"
+          onClick={() => onDelete(image)}
+          title="Eliminar imagen"
+          aria-label="Eliminar imagen"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {image.caption && (
+        <div className="absolute bottom-1.5 left-1.5 right-16 pointer-events-none">
+          <p className="text-xs text-white/90 wrap-break-word line-clamp-1">{image.caption}</p>
+        </div>
+      )}
+    </>
+  )
+}
+
+interface SortableGalleryItemProps {
+  image: ServiceGalleryImage
+  index: number
+  onEdit: (image: ServiceGalleryImage) => void
+  onDelete: (image: ServiceGalleryImage) => void
+}
+
+function SortableGalleryItem({ image, index, onEdit, onDelete }: SortableGalleryItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id })
 
   const style = {
@@ -98,58 +171,15 @@ function SortableGalleryItem({ image, onEdit, onDelete }: SortableGalleryItemPro
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-white/5 ${isDragging ? 'opacity-50 z-10' : ''}`}
+      className={`group relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-shadow duration-200 hover:border-white/20 hover:shadow-lg hover:shadow-black/40 ${isDragging ? 'opacity-30' : ''}`}
     >
-      <Image
-        src={image.image_url}
-        alt={image.caption || 'Imagen de galería'}
-        fill
-        unoptimized
-        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-        className="object-cover"
+      <GalleryThumbnail
+        image={image}
+        index={index}
+        dragHandleProps={{ ...attributes, ...listeners } as React.HTMLAttributes<HTMLButtonElement>}
+        onEdit={onEdit}
+        onDelete={onDelete}
       />
-
-      <div className="absolute top-1.5 left-1.5">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="flex items-center justify-center h-7 w-7 rounded-md bg-black/60 text-white/80 hover:text-white cursor-grab active:cursor-grabbing touch-none"
-          title="Arrastrar para reordenar"
-          aria-label="Arrastrar para reordenar"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 bg-black/60 hover:bg-black/80"
-          onClick={() => onEdit(image)}
-          title="Editar título"
-          aria-label="Editar título"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 bg-black/60 hover:bg-black/80 text-red-400 hover:text-red-300"
-          onClick={() => onDelete(image)}
-          title="Eliminar imagen"
-          aria-label="Eliminar imagen"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      {image.caption && (
-        <div className="absolute bottom-0 inset-x-0 bg-linear-to-t from-black/80 to-transparent px-2 py-1.5">
-          <p className="text-xs text-white wrap-break-word line-clamp-2">{image.caption}</p>
-        </div>
-      )}
     </div>
   )
 }
@@ -165,16 +195,42 @@ function GalleryGrid({ images, onDragEnd, onEdit, onDelete }: GalleryGridProps) 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const activeImage = images.find(i => i.id === activeId) ?? null
+  const activeIndex = activeImage ? images.indexOf(activeImage) : -1
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
+    onDragEnd(event)
+  }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
       <SortableContext items={images.map(i => i.id)} strategy={rectSortingStrategy}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {images.map((image) => (
-            <SortableGalleryItem key={image.id} image={image} onEdit={onEdit} onDelete={onDelete} />
+          {images.map((image, index) => (
+            <SortableGalleryItem key={image.id} image={image} index={index} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </div>
       </SortableContext>
+
+      <DragOverlay>
+        {activeImage && (
+          <div className="relative aspect-square rounded-xl overflow-hidden border border-white/20 shadow-2xl shadow-black/60 rotate-2 scale-105">
+            <GalleryThumbnail image={activeImage} index={activeIndex} onEdit={() => {}} onDelete={() => {}} />
+          </div>
+        )}
+      </DragOverlay>
     </DndContext>
   )
 }
@@ -287,21 +343,38 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-[#1a1a1a] p-4 md:p-6 rounded-lg shadow-sm border border-white/10">
               <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold text-white mb-2 wrap-break-word">
-                  Galería {service ? `— ${service.title}` : ''}
-                </h1>
+                <div className="flex items-center gap-2 mb-2">
+                  <h1 className="text-xl md:text-2xl font-bold text-white wrap-break-word">
+                    Galería {service ? `— ${service.title}` : ''}
+                  </h1>
+                  {images.length > 0 && (
+                    <span className="shrink-0 text-xs font-mono text-white/40 bg-white/5 px-2 py-0.5 rounded-full">
+                      {images.length}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-white/60">Arrastra las imágenes para reordenarlas</p>
               </div>
               <Button onClick={handleCreate} className="gap-2 w-full sm:w-auto shrink-0">
                 <Plus className="w-4 h-4" />
-                Agregar Imagen
+                Agregar Imágenes
               </Button>
             </div>
 
             {images.length === 0 ? (
-              <div className="bg-[#1a1a1a] rounded-lg shadow-sm border border-white/10 h-32 flex items-center justify-center text-center text-white/50 px-4">
-                No hay imágenes en la galería. Agrega una para comenzar.
-              </div>
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="w-full bg-[#1a1a1a] hover:bg-[#1f1f1f] rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 h-56 flex flex-col items-center justify-center gap-3 text-center px-4 transition-colors duration-200"
+              >
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-white/5">
+                  <Images className="w-5 h-5 text-white/50" />
+                </div>
+                <div>
+                  <p className="text-sm text-white/70 font-medium">No hay imágenes en la galería</p>
+                  <p className="text-xs text-white/40 mt-1">Haz click aquí para agregar las primeras</p>
+                </div>
+              </button>
             ) : (
               <GalleryGrid
                 images={images}

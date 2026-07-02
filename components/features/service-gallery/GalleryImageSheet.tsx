@@ -20,7 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Upload, Loader2 } from 'lucide-react'
+import { UploadCloud, Loader2, X, Check, AlertCircle } from 'lucide-react'
 
 interface GalleryImageSheetProps {
   serviceId: string
@@ -29,32 +29,142 @@ interface GalleryImageSheetProps {
   onOpenChange: (open: boolean) => void
 }
 
-type ImageState = {
-  uploadError: string | null
-  previewUrl: string | null
-  selectedFile: File | null
+type PendingStatus = 'pending' | 'uploading' | 'done' | 'error'
+
+type PendingFile = {
+  id: string
+  file: File
+  previewUrl: string
+  status: PendingStatus
+  error?: string
 }
 
-type ImageAction =
-  | { type: 'fileSelected'; file: File; previewUrl: string }
-  | { type: 'validationFailed'; error: string }
-  | { type: 'uploadFailed'; error: string }
+type QueueAction =
+  | { type: 'filesAdded'; files: PendingFile[] }
+  | { type: 'fileRemoved'; id: string }
+  | { type: 'statusChanged'; id: string; status: PendingStatus; error?: string }
+  | { type: 'reset' }
 
-const initialImageState: ImageState = {
-  uploadError: null,
-  previewUrl: null,
-  selectedFile: null,
-}
-
-function imageReducer(state: ImageState, action: ImageAction): ImageState {
+function queueReducer(state: PendingFile[], action: QueueAction): PendingFile[] {
   switch (action.type) {
-    case 'fileSelected':
-      return { uploadError: null, selectedFile: action.file, previewUrl: action.previewUrl }
-    case 'validationFailed':
-      return { uploadError: action.error, selectedFile: null, previewUrl: null }
-    case 'uploadFailed':
-      return { ...state, uploadError: action.error }
+    case 'filesAdded':
+      return [...state, ...action.files]
+    case 'fileRemoved':
+      return state.filter(f => f.id !== action.id)
+    case 'statusChanged':
+      return state.map(f => (f.id === action.id ? { ...f, status: action.status, error: action.error } : f))
+    case 'reset':
+      return []
   }
+}
+
+function makePendingFile(file: File): PendingFile {
+  return {
+    id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
+    file,
+    previewUrl: URL.createObjectURL(file),
+    status: 'pending',
+  }
+}
+
+interface DropzoneProps {
+  disabled: boolean
+  onFiles: (files: File[]) => void
+}
+
+function Dropzone({ disabled, onFiles }: DropzoneProps) {
+  const [isDragging, setIsDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFiles = (fileList: FileList | null) => {
+    if (!fileList) return
+    onFiles(Array.from(fileList))
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); if (!disabled) setIsDragging(true) }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setIsDragging(false)
+        if (!disabled) handleFiles(e.dataTransfer.files)
+      }}
+      onClick={() => !disabled && inputRef.current?.click()}
+      role="button"
+      tabIndex={0}
+      aria-label="Seleccionar o arrastrar imágenes"
+      className={`flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors duration-200 ${
+        isDragging
+          ? 'border-white/50 bg-white/[0.04]'
+          : 'border-white/15 hover:border-white/30 bg-white/[0.02]'
+      } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        aria-label="Seleccionar imágenes"
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+        className="hidden"
+      />
+      <div className="flex items-center justify-center h-11 w-11 rounded-full bg-white/5">
+        <UploadCloud className="w-5 h-5 text-white/60" />
+      </div>
+      <p className="text-sm text-white/80">
+        Arrastra imágenes aquí o <span className="text-white underline underline-offset-2">haz click</span>
+      </p>
+      <p className="text-xs text-white/40">Podés seleccionar varias a la vez • JPEG, PNG, WebP, GIF • Máximo 5MB c/u</p>
+    </div>
+  )
+}
+
+interface PendingGridProps {
+  items: PendingFile[]
+  disabled: boolean
+  onRemove: (id: string) => void
+}
+
+function PendingGrid({ items, disabled, onRemove }: PendingGridProps) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+      {items.map((item) => (
+        <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5">
+          <Image src={item.previewUrl} alt={item.file.name} fill unoptimized className="object-cover" />
+
+          {item.status === 'pending' && !disabled && (
+            <button
+              type="button"
+              onClick={() => onRemove(item.id)}
+              className="absolute top-1 right-1 flex items-center justify-center h-5 w-5 rounded-full bg-black/70 text-white/80 hover:text-white hover:bg-black/90"
+              aria-label={`Quitar ${item.file.name}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+
+          {item.status === 'uploading' && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <Loader2 className="w-4 h-4 text-white animate-spin" />
+            </div>
+          )}
+          {item.status === 'done' && (
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+              <div className="h-6 w-6 rounded-full bg-emerald-500/90 flex items-center justify-center">
+                <Check className="w-3.5 h-3.5 text-white" />
+              </div>
+            </div>
+          )}
+          {item.status === 'error' && (
+            <div className="absolute inset-0 bg-red-950/60 flex items-center justify-center" title={item.error}>
+              <AlertCircle className="w-5 h-5 text-red-300" />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function GalleryImageSheet({ serviceId, image, isOpen, onOpenChange }: GalleryImageSheetProps) {
@@ -63,142 +173,131 @@ export function GalleryImageSheet({ serviceId, image, isOpen, onOpenChange }: Ga
   const updateImage = useUpdateServiceGalleryImage(serviceId)
 
   const [caption, setCaption] = useState(image?.caption || '')
-  const [imageState, dispatchImage] = useReducer(imageReducer, initialImageState)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [queue, dispatchQueue] = useReducer(queueReducer, [])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const isPending = createImage.isPending || updateImage.isPending
-  const hasValidationErrors = () => (!image && !imageState.selectedFile)
+  const isPending = createImage.isPending || updateImage.isPending || isSubmitting
+  const hasValidationErrors = () => (!image && queue.length === 0)
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const validationError = getImageValidationError(file)
-    if (validationError) {
-      dispatchImage({ type: 'validationFailed', error: validationError })
-      return
+  const handleFilesAdded = (files: File[]) => {
+    const validFiles: PendingFile[] = []
+    for (const file of files) {
+      const validationError = getImageValidationError(file)
+      if (validationError) {
+        toast.error(`"${file.name}" no es válida`, { description: validationError })
+        continue
+      }
+      validFiles.push(makePendingFile(file))
     }
-
-    dispatchImage({ type: 'fileSelected', file, previewUrl: URL.createObjectURL(file) })
+    if (validFiles.length > 0) {
+      dispatchQueue({ type: 'filesAdded', files: validFiles })
+    }
   }
 
   const handleSubmit = async () => {
     if (hasValidationErrors()) return
 
-    try {
-      if (image) {
+    if (image) {
+      try {
         await updateImage.mutateAsync({ id: image.id, payload: { caption } })
         toast.success('Imagen actualizada', {
           description: 'Los cambios se guardaron correctamente',
         })
         onOpenChange(false)
-        return
+      } catch (error) {
+        console.error('Error al actualizar imagen de galería:', error)
+        toast.error('Error al actualizar', {
+          description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+        })
       }
+      return
+    }
 
-      if (!imageState.selectedFile) return
+    setIsSubmitting(true)
+    let nextOrder = images.length > 0 ? Math.max(...images.map(i => i.order)) + 1 : 0
+    let successCount = 0
+    let failCount = 0
+
+    for (const item of queue) {
+      dispatchQueue({ type: 'statusChanged', id: item.id, status: 'uploading' })
 
       let uploadedUrl = ''
       try {
-        const result = await uploadToCloudinary(
-          imageState.selectedFile,
-          `photographic-images/services/gallery/${serviceId}`
-        )
+        const result = await uploadToCloudinary(item.file, `photographic-images/services/gallery/${serviceId}`)
         uploadedUrl = result.url
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error al subir la imagen'
-        dispatchImage({ type: 'uploadFailed', error: errorMessage })
-        toast.error('Error al subir imagen', { description: errorMessage })
-        return
+        dispatchQueue({ type: 'statusChanged', id: item.id, status: 'error', error: errorMessage })
+        failCount++
+        continue
       }
 
       try {
-        const nextOrder = images.length > 0 ? Math.max(...images.map(i => i.order)) + 1 : 0
         await createImage.mutateAsync({
           service_id: serviceId,
           image_url: uploadedUrl,
-          caption: caption || undefined,
+          caption: queue.length === 1 ? (caption || undefined) : undefined,
           order: nextOrder,
         })
+        nextOrder++
+        successCount++
+        dispatchQueue({ type: 'statusChanged', id: item.id, status: 'done' })
       } catch (error) {
-        // Evitar dejar una imagen huérfana en Cloudinary si falla el insert en la DB
         await deleteFromCloudinary(uploadedUrl)
-        throw error
+        const errorMessage = error instanceof Error ? error.message : 'Error al guardar en la galería'
+        dispatchQueue({ type: 'statusChanged', id: item.id, status: 'error', error: errorMessage })
+        failCount++
       }
+    }
 
-      toast.success('Imagen agregada', {
-        description: 'La imagen se agregó a la galería correctamente',
+    setIsSubmitting(false)
+
+    if (successCount > 0 && failCount === 0) {
+      toast.success(successCount === 1 ? 'Imagen agregada' : `${successCount} imágenes agregadas`, {
+        description: 'Se guardaron correctamente en la galería',
       })
       onOpenChange(false)
-    } catch (error) {
-      console.error('Error al guardar imagen de galería:', error)
-      toast.error(image ? 'Error al actualizar' : 'Error al agregar imagen', {
-        description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+    } else if (successCount > 0 && failCount > 0) {
+      toast.error(`${successCount} de ${successCount + failCount} imágenes agregadas`, {
+        description: 'Algunas imágenes fallaron. Quita las que fallaron o reintenta.',
+      })
+    } else {
+      toast.error('Error al agregar imágenes', {
+        description: 'No se pudo subir ninguna imagen. Intenta nuevamente.',
       })
     }
   }
+
+  const submitLabel = image
+    ? 'Guardar Cambios'
+    : queue.length > 1
+      ? `Agregar ${queue.length} Imágenes`
+      : 'Agregar Imagen'
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-0">
         <div className="sticky top-0 z-10 bg-[#1a1a1a] border-b border-white/10">
           <SheetHeader className="px-6 py-4">
-            <SheetTitle className="text-xl">{image ? 'Editar Imagen' : 'Nueva Imagen'}</SheetTitle>
+            <SheetTitle className="text-xl">{image ? 'Editar Imagen' : 'Agregar Imágenes'}</SheetTitle>
             <SheetDescription>
-              {image ? 'Actualiza el título de esta imagen' : 'Agrega una imagen a la galería de este servicio'}
+              {image ? 'Actualiza el título de esta imagen' : 'Agrega una o varias imágenes a la galería de este servicio'}
             </SheetDescription>
           </SheetHeader>
         </div>
 
         <div className="px-6 py-6 space-y-6">
           {!image && (
-            <>
-              {imageState.previewUrl && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Vista Previa</Label>
-                  <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-white/10 bg-white/5">
-                    <Image
-                      src={imageState.previewUrl}
-                      alt="Preview"
-                      fill
-                      unoptimized
-                      sizes="(min-width: 640px) 42rem, 100vw"
-                      className="object-cover"
-                    />
-                  </div>
-                </div>
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Imágenes *</Label>
+              <Dropzone disabled={isPending} onFiles={handleFilesAdded} />
+              {queue.length > 0 && (
+                <PendingGrid items={queue} disabled={isPending} onRemove={(id) => dispatchQueue({ type: 'fileRemoved', id })} />
               )}
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Imagen *</Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  aria-label="Seleccionar imagen"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isPending}
-                  className="w-full gap-2 h-11"
-                >
-                  <Upload className="w-4 h-4" />
-                  {imageState.selectedFile ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
-                </Button>
-                {imageState.uploadError && (
-                  <p className="text-xs text-red-400">{imageState.uploadError}</p>
-                )}
-                {!imageState.selectedFile && (
-                  <p className="text-xs text-amber-400">La imagen es requerida</p>
-                )}
-                <p className="text-xs text-white/40">
-                  Formatos: JPEG, PNG, WebP, GIF • Máximo: 5MB
-                </p>
-              </div>
-            </>
+              {queue.length === 0 && (
+                <p className="text-xs text-amber-400">Selecciona al menos una imagen</p>
+              )}
+            </div>
           )}
 
           {image && (
@@ -220,16 +319,23 @@ export function GalleryImageSheet({ serviceId, image, isOpen, onOpenChange }: Ga
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="caption" className="text-sm font-medium">Título (opcional)</Label>
-            <Input
-              id="caption"
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              placeholder="Ej: Sesión en la playa"
-              maxLength={200}
-            />
-          </div>
+          {(image || queue.length <= 1) && (
+            <div className="space-y-2">
+              <Label htmlFor="caption" className="text-sm font-medium">Título (opcional)</Label>
+              <Input
+                id="caption"
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+                placeholder="Ej: Sesión en la playa"
+                maxLength={200}
+              />
+            </div>
+          )}
+          {!image && queue.length > 1 && (
+            <p className="text-xs text-white/40 -mt-2">
+              Podés agregar título a cada imagen luego, editándola individualmente.
+            </p>
+          )}
 
           <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10 -mx-6 px-6 py-4 flex gap-3">
             <Button onClick={handleSubmit} disabled={isPending || hasValidationErrors()} className="flex-1 h-11">
@@ -238,13 +344,11 @@ export function GalleryImageSheet({ serviceId, image, isOpen, onOpenChange }: Ga
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Guardando...
                 </span>
-              ) : image ? (
-                'Guardar Cambios'
               ) : (
-                'Agregar Imagen'
+                submitLabel
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-11">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending} className="h-11">
               Cancelar
             </Button>
           </div>
