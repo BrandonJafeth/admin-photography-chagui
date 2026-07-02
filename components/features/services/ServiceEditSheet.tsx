@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Service } from '@/services/services.service'
 import { useUpdateService } from '@/hooks/useServices'
+import { useServiceGallery } from '@/hooks/useServiceGallery'
 import { getImageValidationError, uploadToCloudinary } from '@/lib/cloudinary'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Upload, Loader2, MessageCircleQuestion, Images } from 'lucide-react'
 import { toast } from '@/lib/toast'
 
@@ -31,7 +42,6 @@ interface ServiceEditSheetProps {
 
 type FormState = {
   title: string
-  slug: string
   description: string
   detailedDescription: string
 }
@@ -70,18 +80,15 @@ function uploadReducer(state: UploadState, action: UploadAction): UploadState {
   }
 }
 
-function hasValidationErrors(form: FormState): boolean {
-  if (!form.title || form.title.length < 3 || form.title.length > 200) return true
-  if (
-    !form.slug ||
-    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) ||
-    form.slug.startsWith('-') ||
-    form.slug.endsWith('-')
-  )
-    return true
-  if (!form.description || form.description.length < 20 || form.description.length > 2000)
-    return true
-  return false
+function getValidationErrors(form: FormState): string[] {
+  const errors: string[] = []
+  if (!form.title || form.title.length < 3 || form.title.length > 200) {
+    errors.push('El título debe tener entre 3 y 200 caracteres')
+  }
+  if (!form.description || form.description.length < 20 || form.description.length > 2000) {
+    errors.push('La descripción debe tener entre 20 y 2000 caracteres')
+  }
+  return errors
 }
 
 interface ImagePreviewUploadProps {
@@ -166,9 +173,15 @@ function ImagePreviewUpload({
 interface ServiceFormFieldsProps {
   form: FormState
   onFieldChange: (name: keyof FormState, value: string) => void
+  touched: Record<string, boolean>
+  submitAttempted: boolean
+  onBlurField: (name: string) => void
 }
 
-function ServiceFormFields({ form, onFieldChange }: ServiceFormFieldsProps) {
+function ServiceFormFields({ form, onFieldChange, touched, submitAttempted, onBlurField }: ServiceFormFieldsProps) {
+  const showTitleError = touched.title || submitAttempted
+  const showDescriptionError = touched.description || submitAttempted
+
   return (
     <>
       <div className="space-y-2 border-t border-white/10 pt-6">
@@ -179,28 +192,11 @@ function ServiceFormFields({ form, onFieldChange }: ServiceFormFieldsProps) {
           id="title"
           value={form.title}
           onChange={e => onFieldChange('title', e.target.value)}
+          onBlur={() => onBlurField('title')}
           placeholder="Ej: BODAS"
         />
-        {form.title && form.title.length < 3 && (
+        {showTitleError && form.title && form.title.length < 3 && (
           <p className="text-xs text-amber-400">El título debe tener al menos 3 caracteres</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="slug" className="text-sm font-medium">
-          Slug (URL) <span className="text-red-400">*</span>
-        </Label>
-        <Input
-          id="slug"
-          value={form.slug}
-          onChange={e => onFieldChange('slug', e.target.value.toLowerCase())}
-          placeholder="Ej: bodas"
-          className="font-mono text-sm"
-        />
-        {form.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) && (
-          <p className="text-xs text-red-400">
-            Solo letras minúsculas, números y guiones (ejemplo: fotografia-bodas)
-          </p>
         )}
       </div>
 
@@ -213,10 +209,11 @@ function ServiceFormFields({ form, onFieldChange }: ServiceFormFieldsProps) {
           aria-label="Descripción"
           value={form.description}
           onChange={e => onFieldChange('description', e.target.value)}
+          onBlur={() => onBlurField('description')}
           className="w-full min-h-[100px] px-3 py-2.5 bg-[#0d0d0d] border border-white/15 rounded-md resize-y text-sm leading-relaxed text-white focus:ring-2 focus:ring-white/10 focus:border-white/40 outline-none"
           placeholder="Describe el servicio de manera clara y concisa..."
         />
-        {form.description && form.description.length < 20 && (
+        {showDescriptionError && form.description && form.description.length < 20 && (
           <p className="text-xs text-amber-400">La descripción debe tener al menos 20 caracteres</p>
         )}
       </div>
@@ -259,16 +256,20 @@ export function ServiceEditSheet({
 }: ServiceEditSheetProps) {
   const [form, dispatchForm] = useReducer(formReducer, {
     title: service.title,
-    slug: service.slug,
     description: service.description,
     detailedDescription: service.detailed_description || '',
   })
   const [features, setFeatures] = useState<string[]>(service.features || [])
   const [useCarousel, setUseCarousel] = useState(service.use_carousel)
+  const { data: galleryImages } = useServiceGallery(service.id)
+  const canUseCarousel = (galleryImages?.length ?? 0) >= 2
   const [upload, dispatchUpload] = useReducer(uploadReducer, {
     isUploading: false,
     uploadError: null,
   })
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const updateService = useUpdateService()
@@ -276,6 +277,17 @@ export function ServiceEditSheet({
   const handleFieldChange = (name: keyof FormState, value: string) => {
     dispatchForm({ type: 'fieldChanged', name, value })
   }
+
+  const handleBlurField = (name: string) => {
+    setTouched(prev => ({ ...prev, [name]: true }))
+  }
+
+  const isDirty = () =>
+    form.title !== service.title ||
+    form.description !== service.description ||
+    form.detailedDescription !== (service.detailed_description || '') ||
+    JSON.stringify(features) !== JSON.stringify(service.features || []) ||
+    useCarousel !== service.use_carousel
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -312,29 +324,9 @@ export function ServiceEditSheet({
   }
 
   const handleSave = async () => {
-    if (!form.title || form.title.length < 3 || form.title.length > 200) {
-      toast.error('Error de validación', {
-        description: 'El título debe tener entre 3 y 200 caracteres',
-      })
-      return
-    }
-
-    if (
-      !form.slug ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) ||
-      form.slug.startsWith('-') ||
-      form.slug.endsWith('-')
-    ) {
-      toast.error('Error de validación', {
-        description: 'El slug debe ser válido (solo letras minúsculas, números y guiones)',
-      })
-      return
-    }
-
-    if (!form.description || form.description.length < 20 || form.description.length > 2000) {
-      toast.error('Error de validación', {
-        description: 'La descripción debe tener entre 20 y 2000 caracteres',
-      })
+    const errors = getValidationErrors(form)
+    if (errors.length > 0) {
+      setSubmitAttempted(true)
       return
     }
 
@@ -343,7 +335,6 @@ export function ServiceEditSheet({
         id: service.id,
         payload: {
           title: form.title,
-          slug: form.slug,
           description: form.description,
           detailed_description: form.detailedDescription || undefined,
           features: features.filter(f => f.trim().length > 0),
@@ -362,9 +353,8 @@ export function ServiceEditSheet({
     }
   }
 
-  const handleCancel = () => {
+  const revertChanges = () => {
     dispatchForm({ type: 'fieldChanged', name: 'title', value: service.title })
-    dispatchForm({ type: 'fieldChanged', name: 'slug', value: service.slug })
     dispatchForm({ type: 'fieldChanged', name: 'description', value: service.description })
     dispatchForm({
       type: 'fieldChanged',
@@ -373,17 +363,43 @@ export function ServiceEditSheet({
     })
     setFeatures(service.features || [])
     setUseCarousel(service.use_carousel)
+    setTouched({})
+    setSubmitAttempted(false)
+  }
+
+  const handleCancel = () => {
+    if (isDirty()) {
+      setConfirmDiscardOpen(true)
+      return
+    }
     onClose()
   }
 
+  const confirmDiscard = () => {
+    revertChanges()
+    setConfirmDiscardOpen(false)
+    onClose()
+  }
+
+  const handleSheetOpenChange = (open: boolean) => {
+    if (!open && isDirty()) {
+      setConfirmDiscardOpen(true)
+      return
+    }
+    onOpenChange(open)
+  }
+
+  const validationErrors = getValidationErrors(form)
+
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+    <>
+    <Sheet open={isOpen} onOpenChange={handleSheetOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
         <div className="sticky top-0 z-10 bg-[#1a1a1a] border-b border-white/10">
           <SheetHeader className="px-6 py-4">
             <SheetTitle className="text-xl">Editar Servicio</SheetTitle>
             <SheetDescription>
-              Actualiza los detalles del servicio
+              Actualiza los detalles del servicio · <span className="text-white/30">* campos requeridos</span>
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -396,7 +412,13 @@ export function ServiceEditSheet({
             onFileSelected={handleImageUpload}
           />
 
-          <ServiceFormFields form={form} onFieldChange={handleFieldChange} />
+          <ServiceFormFields
+            form={form}
+            onFieldChange={handleFieldChange}
+            touched={touched}
+            submitAttempted={submitAttempted}
+            onBlurField={handleBlurField}
+          />
 
           {/* Features */}
           <div className="border-t border-white/10 pt-6">
@@ -433,14 +455,22 @@ export function ServiceEditSheet({
             useCarousel={useCarousel}
             onChange={setUseCarousel}
             disabled={updateService.isPending}
+            carouselEligible={canUseCarousel}
           />
 
           <ServiceMetadata service={service} />
 
-          {hasValidationErrors(form) && (
-            <div className="text-sm text-amber-400 flex items-center gap-2 -mt-4">
-              <span className="w-2 h-2 bg-amber-400 rounded-full" />
-              Por favor corrige los errores antes de guardar
+          {submitAttempted && validationErrors.length > 0 && (
+            <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-3 -mt-4">
+              <p className="mb-1.5 text-sm font-medium text-amber-400">Antes de guardar, corrige:</p>
+              <ul className="space-y-1">
+                {validationErrors.map(err => (
+                  <li key={err} className="flex items-start gap-1.5 text-xs text-amber-400/90">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                    {err}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -449,7 +479,7 @@ export function ServiceEditSheet({
             <Button
               type="submit"
               onClick={handleSave}
-              disabled={updateService.isPending || hasValidationErrors(form)}
+              disabled={updateService.isPending}
               className="flex-1 h-11"
             >
               {updateService.isPending ? (
@@ -474,5 +504,21 @@ export function ServiceEditSheet({
         </div>
       </SheetContent>
     </Sheet>
+
+    <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se perderán los cambios que hiciste en este formulario.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmDiscard}>Descartar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
