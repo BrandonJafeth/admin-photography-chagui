@@ -21,7 +21,10 @@ export async function signIn({ email, password, rememberMe = false }: SignInPayl
 }
 
 export async function signOut(): Promise<void> {
-  const { error } = await supabaseClient.auth.signOut()
+  // scope: 'local' — solo cierra la sesión de este navegador/dispositivo.
+  // El default de Supabase es 'global', que revoca la sesión en TODOS los
+  // dispositivos de la cuenta; eso rompía "recordarme" cross-device.
+  const { error } = await supabaseClient.auth.signOut({ scope: 'local' })
 
   clearRememberState()
 
