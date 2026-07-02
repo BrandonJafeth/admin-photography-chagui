@@ -28,7 +28,9 @@ import {
   useUpdateServiceGalleryOrder,
 } from '@/hooks/useServiceGallery'
 import { ServiceGalleryImage } from '@/services/service-gallery.service'
+import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   AlertDialog,
@@ -93,7 +95,7 @@ interface GalleryThumbnailProps {
 function GalleryThumbnail({ image, index, dragHandleProps, onEdit, onDelete }: GalleryThumbnailProps) {
   return (
     <>
-      <span className="absolute top-2 left-2 z-10 font-mono text-[10px] tracking-widest text-white/50 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
+      <span className="absolute top-2 left-2 z-10 font-mono text-[10px] tracking-widest text-white/50 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded transition-colors duration-300 group-hover:text-white/90">
         {String(index + 1).padStart(2, '0')}
       </span>
 
@@ -103,7 +105,7 @@ function GalleryThumbnail({ image, index, dragHandleProps, onEdit, onDelete }: G
         fill
         unoptimized
         sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-        className="object-cover"
+        className="object-cover grayscale-35 transition-all duration-700 ease-out group-hover:grayscale-0 group-hover:scale-[1.04]"
       />
 
       <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/70 to-transparent pointer-events-none" />
@@ -263,9 +265,11 @@ function DeleteGalleryImageDialog({ isOpen, image, onOpenChange, onConfirm }: De
   )
 }
 
+const EMPTY_IMAGES: ServiceGalleryImage[] = []
+
 export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManagerProps) {
   const { data: service, isLoading: isLoadingService } = useServiceById(serviceId)
-  const { data: fetchedImages = [], isLoading: isLoadingImages } = useServiceGallery(serviceId)
+  const { data: fetchedImages = EMPTY_IMAGES, isLoading: isLoadingImages } = useServiceGallery(serviceId)
   const deleteImage = useDeleteServiceGalleryImage(serviceId)
   const updateOrder = useUpdateServiceGalleryOrder(serviceId)
 
@@ -279,6 +283,10 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
   useEffect(() => {
     setImages(fetchedImages)
   }, [fetchedImages])
+
+  // Las páginas son slices contiguos de `images`, así que arrastrar dentro de
+  // una página sigue reordenando índices globales correctos.
+  const { paginatedItems: paginatedImages, page, totalPages, goToPage } = usePagination(images, { pageSize: 12 })
 
   const handleCreate = () => {
     dispatchSheet({ type: 'opened', image: null })
@@ -351,19 +359,25 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
               </Button>
             </Link>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-[#1a1a1a] p-4 md:p-6 rounded-lg shadow-sm border border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pb-6 border-b border-white/10">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-xl md:text-2xl font-bold text-white wrap-break-word">
-                    Galería {service ? `— ${service.title}` : ''}
+                <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-white/40 mb-2">
+                  Galería de servicio
+                </p>
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <h1
+                    className="text-3xl md:text-4xl italic text-white wrap-break-word"
+                    style={{ fontFamily: 'var(--font-playfair)' }}
+                  >
+                    {service ? service.title : 'Galería'}
                   </h1>
                   {images.length > 0 && (
-                    <span className="shrink-0 text-xs font-mono text-white/40 bg-white/5 px-2 py-0.5 rounded-full">
-                      {images.length}
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-white/40">
+                      {String(images.length).padStart(2, '0')} {images.length === 1 ? 'imagen' : 'imágenes'}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-white/60">Arrastra las imágenes para reordenarlas</p>
+                <p className="text-sm text-white/50 mt-2">Arrastra las imágenes para reordenarlas</p>
               </div>
               <Button onClick={handleCreate} className="gap-2 w-full sm:w-auto shrink-0">
                 <Plus className="w-4 h-4" />
@@ -375,23 +389,33 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
               <button
                 type="button"
                 onClick={handleCreate}
-                className="w-full bg-[#1a1a1a] hover:bg-[#1f1f1f] rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 h-56 flex flex-col items-center justify-center gap-3 text-center px-4 transition-colors duration-200"
+                className="w-full bg-[#1a1a1a] hover:bg-[#1f1f1f] rounded-xl border border-dashed border-white/10 hover:border-white/25 h-64 flex flex-col items-center justify-center gap-4 text-center px-4 transition-colors duration-300"
               >
-                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-white/5">
+                <div className="flex items-center justify-center h-14 w-14 rounded-full border border-white/10 bg-white/5">
                   <Images className="w-5 h-5 text-white/50" />
                 </div>
                 <div>
-                  <p className="text-sm text-white/70 font-medium">No hay imágenes en la galería</p>
-                  <p className="text-xs text-white/40 mt-1">Haz click aquí para agregar las primeras</p>
+                  <p
+                    className="text-lg italic text-white/80"
+                    style={{ fontFamily: 'var(--font-playfair)' }}
+                  >
+                    Aún no hay imágenes
+                  </p>
+                  <p className="text-xs text-white/40 mt-1.5 font-mono uppercase tracking-widest">
+                    Toca para agregar las primeras
+                  </p>
                 </div>
               </button>
             ) : (
-              <GalleryGrid
-                images={images}
-                onDragEnd={handleDragEnd}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
+              <>
+                <GalleryGrid
+                  images={paginatedImages}
+                  onDragEnd={handleDragEnd}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+                <PaginationControls page={page} totalPages={totalPages} onPageChange={goToPage} className="mt-6" />
+              </>
             )}
           </div>
         </div>

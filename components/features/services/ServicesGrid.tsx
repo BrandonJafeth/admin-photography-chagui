@@ -21,7 +21,9 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Service } from '@/services/services.service'
 import { useDeleteService, useUpdateService, useUpdateServicesOrder } from '@/hooks/useServices'
+import { usePagination } from '@/hooks/usePagination'
 import { Button } from '@/components/ui/button'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Trash2, Eye, EyeOff, GripVertical, Pencil, Loader2 } from 'lucide-react'
 import { ServiceEditSheet } from './ServiceEditSheet'
 import { toast } from '@/lib/toast'
@@ -316,6 +318,10 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
   const editingService = items.find(svc => svc.id === editingId)
   const activeService = items.find(svc => svc.id === activeId) ?? null
 
+  // Reordering needs the full ordered list on screen to drag across it —
+  // pagination only applies to the static (non-reordering) view.
+  const { paginatedItems: paginatedServices, page, totalPages, goToPage } = usePagination(services, { pageSize: 12 })
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
   }
@@ -432,20 +438,24 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
           </DragOverlay>
         </DndContext>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((service, index) => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              index={index}
-              isReordering={isReordering}
-              isToggling={togglingId === service.id}
-              onToggleVisibility={handleToggleVisibility}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedServices.map((service, index) => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                index={index}
+                isReordering={isReordering}
+                isToggling={togglingId === service.id}
+                onToggleVisibility={handleToggleVisibility}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+
+          <PaginationControls page={page} totalPages={totalPages} onPageChange={goToPage} className="mt-6" />
+        </>
       )}
 
       {editingService && (

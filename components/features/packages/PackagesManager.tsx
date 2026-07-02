@@ -4,10 +4,12 @@ import { useReducer, useState } from 'react'
 import { toast } from '@/lib/toast'
 import { usePackages, useDeletePackage, useUpdatePackage } from '@/hooks/usePackages'
 import { useServices } from '@/hooks/useServices'
+import { usePagination } from '@/hooks/usePagination'
 import { Package } from '@/services/packages.service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import {
   Table,
   TableBody,
@@ -83,6 +85,7 @@ export default function PackagesManager() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const serviceNameById = new Map(services.map(s => [s.id, s.title]))
+  const { paginatedItems: paginatedPackages, page, totalPages, goToPage } = usePagination(packages, { pageSize: 10 })
 
   const handleCreate = () => {
     dispatchSheet({ type: 'createRequested' })
@@ -191,7 +194,7 @@ export default function PackagesManager() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    packages.map(pkg => (
+                    paginatedPackages.map(pkg => (
                       <TableRow key={pkg.id}>
                         <TableCell className="font-medium text-white">{pkg.name}</TableCell>
                         <TableCell className="text-white/60">
@@ -266,6 +269,13 @@ export default function PackagesManager() {
                   )}
                 </TableBody>
               </Table>
+
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                className="px-4 pb-4"
+              />
             </div>
           </div>
         </div>
