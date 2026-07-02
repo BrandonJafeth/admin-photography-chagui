@@ -253,7 +253,7 @@ export async function deleteFromCloudinary(url: string): Promise<boolean> {
  * @param urls - Array de URLs de imágenes en Cloudinary
  * @returns Número de imágenes eliminadas correctamente
  */
-async function deleteManyFromCloudinary(urls: string[]): Promise<number> {
+export async function deleteManyFromCloudinary(urls: string[]): Promise<number> {
   if (urls.length === 0) return 0
 
   const deletePromises = urls.map(url => deleteFromCloudinary(url))

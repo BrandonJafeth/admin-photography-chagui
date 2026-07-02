@@ -17,7 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Upload, Loader2, MessageCircleQuestion } from 'lucide-react'
+import { Upload, Loader2, MessageCircleQuestion, Images } from 'lucide-react'
 import { toast } from '@/lib/toast'
 
 interface ServiceEditSheetProps {
@@ -411,6 +411,16 @@ export function ServiceEditSheet({
               <Button type="button" variant="outline" className="w-full gap-2">
                 <MessageCircleQuestion className="w-4 h-4" />
                 Gestionar Preguntas Frecuentes
+              </Button>
+            </Link>
+          </div>
+
+          {/* Galería */}
+          <div className="border-t border-white/10 pt-6">
+            <Link href={`/servicios/${service.id}/galeria`} onClick={onClose}>
+              <Button type="button" variant="outline" className="w-full gap-2">
+                <Images className="w-4 h-4" />
+                Gestionar Galería
               </Button>
             </Link>
           </div>

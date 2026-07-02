@@ -1,6 +1,6 @@
 // services/services.service.ts
 import { createClient } from '@/lib/supabase/client'
-import { deleteFromCloudinary } from '@/lib/cloudinary'
+import { deleteFromCloudinary, deleteManyFromCloudinary } from '@/lib/cloudinary'
 
 export interface Service {
   id: string
@@ -165,12 +165,26 @@ export class ServicesService {
 
     if (fetchError) throw new Error(`Error al obtener servicio: ${fetchError.message}`)
 
+    // Obtener imágenes de la galería para eliminarlas de Cloudinary (la FK con CASCADE
+    // solo borra las filas, no limpia Cloudinary)
+    const { data: galleryImages, error: galleryFetchError } = await supabase
+      .from('service_gallery')
+      .select('image_url')
+      .eq('service_id', id)
+
+    if (galleryFetchError) throw new Error(`Error al obtener galería: ${galleryFetchError.message}`)
+
     // Eliminar imagen principal del servicio de Cloudinary
     if (service.image) {
       await deleteFromCloudinary(service.image)
     }
 
-    // Eliminar el servicio de la base de datos (FAQs y paquetes se eliminan/desvinculan por FK)
+    // Eliminar imágenes de la galería de Cloudinary
+    if (galleryImages && galleryImages.length > 0) {
+      await deleteManyFromCloudinary(galleryImages.map((g) => g.image_url))
+    }
+
+    // Eliminar el servicio de la base de datos (FAQs, galería y paquetes se eliminan/desvinculan por FK)
     const { error } = await supabase
       .from('services')
       .delete()
