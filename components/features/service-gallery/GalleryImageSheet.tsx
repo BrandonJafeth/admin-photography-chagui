@@ -90,15 +90,6 @@ function Dropzone({ disabled, onFiles }: DropzoneProps) {
         setIsDragging(false)
         if (!disabled) handleFiles(e.dataTransfer.files)
       }}
-      onClick={() => !disabled && inputRef.current?.click()}
-      role="button"
-      tabIndex={0}
-      aria-label="Seleccionar o arrastrar imágenes"
-      className={`flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors duration-200 ${
-        isDragging
-          ? 'border-white/50 bg-white/[0.04]'
-          : 'border-white/15 hover:border-white/30 bg-white/[0.02]'
-      } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <input
         ref={inputRef}
@@ -109,13 +100,25 @@ function Dropzone({ disabled, onFiles }: DropzoneProps) {
         onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
         className="hidden"
       />
-      <div className="flex items-center justify-center h-11 w-11 rounded-full bg-white/5">
-        <UploadCloud className="w-5 h-5 text-white/60" />
-      </div>
-      <p className="text-sm text-white/80">
-        Arrastra imágenes aquí o <span className="text-white underline underline-offset-2">haz click</span>
-      </p>
-      <p className="text-xs text-white/40">Podés seleccionar varias a la vez • JPEG, PNG, WebP, GIF • Máximo 5MB c/u</p>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        aria-label="Seleccionar o arrastrar imágenes"
+        className={`flex flex-col items-center justify-center gap-2.5 w-full rounded-xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors duration-200 ${
+          isDragging
+            ? 'border-white/50 bg-white/[0.04]'
+            : 'border-white/15 hover:border-white/30 bg-white/[0.02]'
+        } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+      >
+        <div className="flex items-center justify-center h-11 w-11 rounded-full bg-white/5">
+          <UploadCloud className="w-5 h-5 text-white/60" />
+        </div>
+        <p className="text-sm text-white/80">
+          Arrastra imágenes aquí o <span className="text-white underline underline-offset-2">haz click</span>
+        </p>
+        <p className="text-xs text-white/40">Podés seleccionar varias a la vez • JPEG, PNG, WebP, GIF • Máximo 5MB c/u</p>
+      </button>
     </div>
   )
 }
@@ -131,7 +134,14 @@ function PendingGrid({ items, disabled, onRemove }: PendingGridProps) {
     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
       {items.map((item) => (
         <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5">
-          <Image src={item.previewUrl} alt={item.file.name} fill unoptimized className="object-cover" />
+          <Image
+            src={item.previewUrl}
+            alt={item.file.name}
+            fill
+            unoptimized
+            sizes="(min-width: 640px) 144px, 33vw"
+            className="object-cover"
+          />
 
           {item.status === 'pending' && !disabled && (
             <button

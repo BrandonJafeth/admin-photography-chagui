@@ -1,6 +1,6 @@
 'use client'
 
-import { useReducer, useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -265,12 +265,20 @@ function DeleteGalleryImageDialog({ isOpen, image, onOpenChange, onConfirm }: De
 
 export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManagerProps) {
   const { data: service, isLoading: isLoadingService } = useServiceById(serviceId)
-  const { data: images = [], isLoading: isLoadingImages } = useServiceGallery(serviceId)
+  const { data: fetchedImages = [], isLoading: isLoadingImages } = useServiceGallery(serviceId)
   const deleteImage = useDeleteServiceGalleryImage(serviceId)
   const updateOrder = useUpdateServiceGalleryOrder(serviceId)
 
+  const [images, setImages] = useState(fetchedImages)
   const [sheetState, dispatchSheet] = useReducer(sheetReducer, { isOpen: false, editingImage: null, newImageNonce: 0 })
   const [deleteState, dispatchDelete] = useReducer(deleteDialogReducer, { isOpen: false, imageToDelete: null })
+
+  // Espeja `fetchedImages` en estado local: el reorder se aplica al soltar,
+  // sin esperar a que la mutation optimista redondee por el query cache —
+  // evita el salto "va y vuelve" mientras el cache todavía tiene el orden viejo.
+  useEffect(() => {
+    setImages(fetchedImages)
+  }, [fetchedImages])
 
   const handleCreate = () => {
     dispatchSheet({ type: 'opened', image: null })
@@ -309,6 +317,8 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
     if (oldIndex === -1 || newIndex === -1) return
 
     const reordered = arrayMove(images, oldIndex, newIndex)
+    setImages(reordered)
+
     const updates = reordered.map((image, i) => ({ id: image.id, order: i }))
 
     try {

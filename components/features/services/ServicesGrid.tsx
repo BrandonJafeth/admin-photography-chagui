@@ -1,7 +1,24 @@
 'use client'
 
-import { useReducer, useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import Image from 'next/image'
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Service } from '@/services/services.service'
 import { useDeleteService, useUpdateService, useUpdateServicesOrder } from '@/hooks/useServices'
 import { Button } from '@/components/ui/button'
@@ -23,23 +40,6 @@ import {
 interface ServicesGridProps {
   services: Service[]
   isReordering: boolean
-}
-
-type DragState = { draggedId: string | null; dragPosition: { x: number; y: number } }
-type DragAction =
-  | { type: 'dragStarted'; id: string; x: number; y: number }
-  | { type: 'dragMoved'; x: number; y: number }
-  | { type: 'dragEnded' }
-
-function dragReducer(state: DragState, action: DragAction): DragState {
-  switch (action.type) {
-    case 'dragStarted':
-      return { draggedId: action.id, dragPosition: { x: action.x, y: action.y } }
-    case 'dragMoved':
-      return { ...state, dragPosition: { x: action.x, y: action.y } }
-    case 'dragEnded':
-      return { ...state, draggedId: null }
-  }
 }
 
 type EditSheetState = { editingId: string | null; isSheetOpen: boolean }
@@ -78,40 +78,29 @@ function deleteDialogReducer(state: DeleteDialogState, action: DeleteDialogActio
 
 interface DraggedServicePreviewProps {
   service: Service
-  position: { x: number; y: number }
 }
 
-function DraggedServicePreview({ service, position }: DraggedServicePreviewProps) {
+function DraggedServicePreview({ service }: DraggedServicePreviewProps) {
   return (
-    <div
-      className="fixed pointer-events-none z-[9999] opacity-90"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: 'translate(-50%, -50%)',
-        width: '300px',
-      }}
-    >
-      <div className="rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl">
-        <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
-          {service.image ? (
-            <Image
-              src={service.image}
-              alt={service.title}
-              fill
-              sizes="300px"
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-white/5">
-              <span className="text-white/40 text-sm">Sin imagen</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <h3 className="text-sm font-bold text-white truncate">{service.title}</h3>
-          <p className="text-xs text-white/50 truncate">/{service.slug}</p>
-        </div>
+    <div className="w-[300px] rounded-xl overflow-hidden bg-[#1a1a1a] border-2 border-white/30 shadow-2xl rotate-2 scale-105">
+      <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
+        {service.image ? (
+          <Image
+            src={service.image}
+            alt={service.title}
+            fill
+            sizes="300px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-white/5">
+            <span className="text-white/40 text-sm">Sin imagen</span>
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <h3 className="text-sm font-bold text-white truncate">{service.title}</h3>
+        <p className="text-xs text-white/50 truncate">/{service.slug}</p>
       </div>
     </div>
   )
@@ -121,13 +110,8 @@ interface ServiceCardProps {
   service: Service
   index: number
   isReordering: boolean
-  isDragged: boolean
   isToggling: boolean
-  onDragStart: (id: string, e: React.DragEvent) => void
-  onDrag: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: (id: string) => void
-  onDragEnd: () => void
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
   onToggleVisibility: (id: string, isVisible: boolean) => void
   onEdit: (id: string) => void
   onDelete: (id: string, title: string) => void
@@ -137,28 +121,15 @@ function ServiceCard({
   service,
   index,
   isReordering,
-  isDragged,
   isToggling,
-  onDragStart,
-  onDrag,
-  onDragOver,
-  onDrop,
-  onDragEnd,
+  dragHandleProps,
   onToggleVisibility,
   onEdit,
   onDelete,
 }: ServiceCardProps) {
   return (
     <div
-      draggable={isReordering}
-      onDragStart={(e) => onDragStart(service.id, e)}
-      onDrag={onDrag}
-      onDragOver={onDragOver}
-      onDrop={() => onDrop(service.id)}
-      onDragEnd={onDragEnd}
-      className={`relative group rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 shadow-md hover:shadow-xl transition-all ${isReordering ? 'cursor-move' : 'cursor-default'} ${isDragged
-        ? 'ring-4 ring-white/40 shadow-2xl scale-105'
-        : 'hover:scale-[1.02]'
+      className={`relative group rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 shadow-md hover:shadow-xl transition-all ${isReordering ? '' : 'hover:scale-[1.02]'
         }`}
     >
       {/* Imagen */}
@@ -190,9 +161,15 @@ function ServiceCard({
         )}
 
         {isReordering && (
-          <div className="absolute top-2 left-2 bg-white text-black p-2 rounded cursor-move shadow-lg">
+          <button
+            type="button"
+            {...dragHandleProps}
+            className="absolute top-2 left-2 bg-white text-black p-2 rounded shadow-lg cursor-grab active:cursor-grabbing touch-none"
+            aria-label="Arrastrar para reordenar"
+            title="Arrastrar para reordenar"
+          >
             <GripVertical className="w-4 h-4" />
-          </div>
+          </button>
         )}
       </div>
 
@@ -265,6 +242,21 @@ function ServiceCard({
   )
 }
 
+function SortableServiceCard(props: ServiceCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.service.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-30' : ''}>
+      <ServiceCard {...props} dragHandleProps={{ ...attributes, ...listeners } as React.HTMLAttributes<HTMLButtonElement>} />
+    </div>
+  )
+}
+
 interface DeleteServiceDialogProps {
   open: boolean
   serviceTitle: string | undefined
@@ -297,7 +289,8 @@ function DeleteServiceDialog({ open, serviceTitle, onOpenChange, onConfirm }: De
 }
 
 export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
-  const [dragState, dispatchDrag] = useReducer(dragReducer, { draggedId: null, dragPosition: { x: 0, y: 0 } })
+  const [items, setItems] = useState(services)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [editSheetState, dispatchEditSheet] = useReducer(editSheetReducer, { editingId: null, isSheetOpen: false })
   const [deleteDialogState, dispatchDeleteDialog] = useReducer(deleteDialogReducer, { deleteDialogOpen: false, serviceToDelete: null })
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -306,58 +299,41 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
   const updateService = useUpdateService()
   const updateOrder = useUpdateServicesOrder()
 
-  const { draggedId, dragPosition } = dragState
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  // Espeja `services` en estado local: el reorder se aplica al soltar, sin
+  // esperar a que la mutation optimista redondee por el query cache — evita
+  // el salto "va y vuelve" mientras el cache todavía tiene el orden viejo.
+  useEffect(() => {
+    setItems(services)
+  }, [services])
+
   const { editingId, isSheetOpen } = editSheetState
   const { deleteDialogOpen, serviceToDelete } = deleteDialogState
 
-  const editingService = services.find(svc => svc.id === editingId)
+  const editingService = items.find(svc => svc.id === editingId)
+  const activeService = items.find(svc => svc.id === activeId) ?? null
 
-  const handleDragStart = (id: string, e: React.DragEvent) => {
-    if (!isReordering) return
-    dispatchDrag({ type: 'dragStarted', id, x: e.clientX, y: e.clientY })
-
-    const ghost = document.createElement('div')
-    ghost.style.opacity = '0'
-    document.body.appendChild(ghost)
-    e.dataTransfer.setDragImage(ghost, 0, 0)
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
   }
 
-  const handleDrag = (e: React.DragEvent) => {
-    if (!isReordering || e.clientX === 0 || e.clientY === 0) return
-    dispatchDrag({ type: 'dragMoved', x: e.clientX, y: e.clientY })
-  }
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null)
 
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isReordering) return
-    e.preventDefault()
-  }
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-  const handleDragEnd = () => {
-    dispatchDrag({ type: 'dragEnded' })
-  }
+    const oldIndex = items.findIndex(svc => svc.id === active.id)
+    const newIndex = items.findIndex(svc => svc.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
 
-  const handleDrop = async (targetId: string) => {
-    if (!isReordering || !draggedId || draggedId === targetId) {
-      dispatchDrag({ type: 'dragEnded' })
-      return
-    }
+    const reordered = arrayMove(items, oldIndex, newIndex)
+    setItems(reordered)
 
-    const draggedIndex = services.findIndex(svc => svc.id === draggedId)
-    const targetIndex = services.findIndex(svc => svc.id === targetId)
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      dispatchDrag({ type: 'dragEnded' })
-      return
-    }
-
-    const newServices = [...services]
-    const [draggedService] = newServices.splice(draggedIndex, 1)
-    newServices.splice(targetIndex, 0, draggedService)
-
-    const updates = newServices.map((svc, index) => ({
-      id: svc.id,
-      order: index,
-    }))
+    const updates = reordered.map((svc, index) => ({ id: svc.id, order: index }))
 
     try {
       await updateOrder.mutateAsync(updates)
@@ -370,8 +346,6 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
         description: 'No se pudo actualizar el orden. Intenta nuevamente.',
       })
     }
-
-    dispatchDrag({ type: 'dragEnded' })
   }
 
   const handleToggleVisibility = async (id: string, isVisible: boolean) => {
@@ -426,34 +400,53 @@ export function ServicesGrid({ services, isReordering }: ServicesGridProps) {
     }
   }
 
-  const draggedService = services.find(svc => svc.id === draggedId)
-
   return (
     <>
-      {draggedId && draggedService && (
-        <DraggedServicePreview service={draggedService} position={dragPosition} />
-      )}
+      {isReordering ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
+          <SortableContext items={items.map(s => s.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((service, index) => (
+                <SortableServiceCard
+                  key={service.id}
+                  service={service}
+                  index={index}
+                  isReordering={isReordering}
+                  isToggling={togglingId === service.id}
+                  onToggleVisibility={handleToggleVisibility}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          </SortableContext>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {services.map((service, index) => (
-          <ServiceCard
-            key={service.id}
-            service={service}
-            index={index}
-            isReordering={isReordering}
-            isDragged={draggedId === service.id}
-            isToggling={togglingId === service.id}
-            onDragStart={handleDragStart}
-            onDrag={handleDrag}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            onToggleVisibility={handleToggleVisibility}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
+          <DragOverlay>
+            {activeService && <DraggedServicePreview service={activeService} />}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {services.map((service, index) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              index={index}
+              isReordering={isReordering}
+              isToggling={togglingId === service.id}
+              onToggleVisibility={handleToggleVisibility}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
 
       {editingService && (
         <ServiceEditSheet
