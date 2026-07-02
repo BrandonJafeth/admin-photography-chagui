@@ -188,18 +188,19 @@ function SortableGalleryItem({ image, index, onEdit, onDelete }: SortableGallery
 
 interface GalleryGridProps {
   images: ServiceGalleryImage[]
+  pageOffset: number
   onDragEnd: (event: DragEndEvent) => void
   onEdit: (image: ServiceGalleryImage) => void
   onDelete: (image: ServiceGalleryImage) => void
 }
 
-function GalleryGrid({ images, onDragEnd, onEdit, onDelete }: GalleryGridProps) {
+function GalleryGrid({ images, pageOffset, onDragEnd, onEdit, onDelete }: GalleryGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeImage = images.find(i => i.id === activeId) ?? null
-  const activeIndex = activeImage ? images.indexOf(activeImage) : -1
+  const activeIndex = activeImage ? pageOffset + images.indexOf(activeImage) : -1
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
@@ -221,7 +222,7 @@ function GalleryGrid({ images, onDragEnd, onEdit, onDelete }: GalleryGridProps) 
       <SortableContext items={images.map(i => i.id)} strategy={rectSortingStrategy}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {images.map((image, index) => (
-            <SortableGalleryItem key={image.id} image={image} index={index} onEdit={onEdit} onDelete={onDelete} />
+            <SortableGalleryItem key={image.id} image={image} index={pageOffset + index} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </div>
       </SortableContext>
@@ -285,8 +286,10 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
   }, [fetchedImages])
 
   // Las páginas son slices contiguos de `images`, así que arrastrar dentro de
-  // una página sigue reordenando índices globales correctos.
-  const { paginatedItems: paginatedImages, page, totalPages, goToPage } = usePagination(images, { pageSize: 12 })
+  // una página sigue reordenando índices globales correctos. El reorden entre
+  // páginas no es posible por drag (solo se renderizan los ids de la página
+  // visible); el usuario puede lograrlo editando desde páginas adyacentes.
+  const { paginatedItems: paginatedImages, page, totalPages, goToPage, pageSize } = usePagination(images, { pageSize: 12 })
 
   const handleCreate = () => {
     dispatchSheet({ type: 'opened', image: null })
@@ -377,7 +380,11 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-white/50 mt-2">Arrastra las imágenes para reordenarlas</p>
+                <p className="text-sm text-white/50 mt-2">
+                  {totalPages > 1
+                    ? 'Arrastra las imágenes para reordenarlas dentro de cada página'
+                    : 'Arrastra las imágenes para reordenarlas'}
+                </p>
               </div>
               <Button onClick={handleCreate} className="gap-2 w-full sm:w-auto shrink-0">
                 <Plus className="w-4 h-4" />
@@ -410,6 +417,7 @@ export default function ServiceGalleryManager({ serviceId }: ServiceGalleryManag
               <>
                 <GalleryGrid
                   images={paginatedImages}
+                  pageOffset={(page - 1) * pageSize}
                   onDragEnd={handleDragEnd}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
